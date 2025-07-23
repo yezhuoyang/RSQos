@@ -7,6 +7,17 @@ The first implementation is based on TQEC software developed by Google https://t
 
 
 
+# High-level design
+
+On the highlest level, our kenel deal with logical process that users want to execute on a fault-tolerant quantum hardware.
+The kernel manage all these process, optimize the resource usage.
+
+
+- [ ] Logical quantum process
+- [ ] Kernel for logical quantum computer
+
+
+
 # TODO List
 
 
