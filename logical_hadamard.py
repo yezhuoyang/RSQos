@@ -1,46 +1,37 @@
-#Explicit construction of Logical CNOT gate
+from fractions import Fraction
 
+from pyzx import EdgeType, VertexType
+from pyzx.graph.graph_s import GraphS
 
-
-
-from tqec import BlockGraph
+from tqec.interop import block_synthesis
 from tqec.utils.position import Position3D
 from tqec import BlockGraph, compile_block_graph, NoiseModel
-from tqec.computation.cube import (
-    Cube,
-    Port,
-    YHalfCube,
-    ZXCube,
-    cube_kind_from_string,
-)
-import sinter
-import os
-import stim
-from pathlib import Path
-
-
-
 
 
 
 if __name__ == "__main__":
+    # Example usage of the block synthesis
+    # Define a ZX graph
 
+    g_zx = GraphS()
+    g_zx.add_vertices(5)
+    g_zx.set_type(1, VertexType.Z)
+    g_zx.set_type(3, VertexType.Z)
+    g_zx.set_type(4, VertexType.Z)
+    g_zx.set_phase(4, Fraction(1, 2))
+    g_zx.add_edges([(0, 1), (1, 2), (1, 3), (3, 4)])
+    g_zx.set_inputs((0,))
+    g_zx.set_outputs((2,))
 
-    g = BlockGraph("CNOT")
-    cubes = [
-        (Position3D(0, 0, 0), "P", "In_Control"),
-        (Position3D(0, 0, 1), "ZXZ", ""),    
-        (Position3D(0, 0, 2), "P", "Out_Target"),
-    ]
-    for pos, kind, label in cubes:
-        g.add_cube(pos, kind, label)
+    positions = {
+        0: Position3D(0, 0, 0),
+        1: Position3D(0, 0, 1),
+        2: Position3D(0, 0, 2),
+        3: Position3D(1, 0, 1),
+        4: Position3D(1, 0, 2),
+    }
 
-    pipes = [(0, 1), (1, 2)]
-
-    for p0, p1 in pipes:
-        g.add_pipe(cubes[p0][0], cubes[p1][0])
-    
-    g.fill_ports(ZXCube.from_str("ZXZ"))  # generic cube type; adjust if needed
+    g = block_synthesis(g_zx, positions=positions)
 
     # 2. Get the correlation surfaces of interest and compile the computation
     correlation_surfaces = g.find_correlation_surfaces()
@@ -55,20 +46,7 @@ if __name__ == "__main__":
         noise_model=NoiseModel.uniform_depolarizing(0.001),
     )
 
-
-    # # # 4. Write the circuit to a text file
-    output_path = Path("cnot_stim.txt")
-    # with output_path.open("w") as f:
-    #     f.write(str(circuit))
-
-    # Read the circuit from file
-    with output_path.open("r") as f:
-        circuit = f.read()
-
     circuit=stim.Circuit(circuit)
-
-
-    print(f"Circuit has been written to {output_path}")
 
 
     pvalue=0.001
