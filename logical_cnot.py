@@ -40,7 +40,11 @@ if __name__ == "__main__":
     for p0, p1 in pipes:
         g.add_pipe(cubes[p0][0], cubes[p1][0])
     
-    g.fill_ports(ZXCube.from_str("ZXZ"))  # generic cube type; adjust if needed
+    
+    filled_gs = g.fill_ports_for_minimal_simulation()
+    assert len(filled_gs) == 2
+    g = filled_gs[0].graph
+
 
     # 2. Get the correlation surfaces of interest and compile the computation
     correlation_surfaces = g.find_correlation_surfaces()

@@ -1,34 +1,40 @@
 #Fault-tolerant process on a fault-tolerant quantum computer
 
-from tqec import BlockGraph, compile_block_graph, NoiseModel
-import sinter
-import os
-import stim
+from instruction import Instype, instruction
+from virtualSpace import virtualSpace
+from syscall import syscall, syscalltype
 
 
 
 class process:
 
-    def __init__(self, name, process_type, **kwargs):
-        self.name = name
-        self.process_type = process_type
-        self.parameters = kwargs
-        self._circuit_list=[]
+    def __init__(self, processID):
+        self._processID = processID
+        self._instruction_list = []
+        self._syscall_list = []
+
+    @property
+    def add_instruction(self, instruction: instruction):
+        """
+        Add an instruction to the process.
+        """
+        if isinstance(instruction, instruction):
+            self._instruction_list.append(instruction)
+        else:
+            raise TypeError("Expected an instruction instance.")
 
 
     @property
-    def add_circuit(self, circuit:BlockGraph):
+    def add_syscall(self, syscall: syscall):
         """
-        Add a BlockGraph circuit to the process.
+        Add a syscall to the process.
         """
-        if isinstance(circuit, BlockGraph):
-            self._circuit_list.append(circuit)
+        if isinstance(syscall, syscall):
+            self._syscall_list.append(syscall)
         else:
-            raise TypeError("Expected a BlockGraph instance.") 
+            raise TypeError("Expected a syscall instance.")
 
 
-    def __repr__(self):
-        return f"Process(name={self.name}, type={self.process_type}, parameters={self.parameters})"
 
     def execute(self):
         # Placeholder for execution logic
