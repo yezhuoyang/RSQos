@@ -8,11 +8,19 @@ from syscall import *
 
 class process:
 
-    def __init__(self, processID):
+    def __init__(self, processID, start_time):
+        self._start_time=start_time
         self._processID = processID
         self._instruction_list = []
         self._syscall_list = []
-        self._current_time = 0
+        self._current_time = start_time
+        """
+        Keep tract of the execution of all instruction
+        Help the kernel and schedule to estimate the resources
+        consumed_qpu_time keep track of how long this process has been executed on the hardware
+        """
+        self._executed = {}
+        self._consumed_qpu_time = 0
 
 
     def add_instruction(self, type:Instype, qubitaddress:List[virtualAddress]):
@@ -21,7 +29,12 @@ class process:
         """
         time = self._current_time
         self._current_time += get_clocktime(type)  # Increment time for the next instruction 
-        self._instruction_list.append(instruction(type, qubitaddress, time))
+        inst=instruction(type, qubitaddress, time)
+        self._instruction_list.append(inst)
+        self._executed[inst] = False
+
+    def get_instruction_list(self):
+        return self._instruction_list
 
 
     def add_syscall(self, syscallinst: syscall):
@@ -45,10 +58,10 @@ class process:
                 outputstr += f"Syscall: {inst}\n"
         return outputstr
 
-    def execute(self):
-        # Placeholder for execution logic
-        print(f"Executing {self.process_type} process: {self.name} with parameters {self.parameters}")
 
+    def execute_instruction(self, inst: instruction):
+        self._executed[inst] = True
+        self._consumed_qpu_time += get_clocktime(inst.type) 
 
 
 

@@ -25,6 +25,8 @@ class Kernel:
         else:
             raise TypeError("Expected a process instance.")
 
+    def get_processes(self):
+        return self._processes
 
     def execute(self, circuit):
         # Execute the given quantum circuit
