@@ -29,6 +29,13 @@ class virtualSpace:
         """
         return f"VSpace '{self._label}' with size {self._size}"
 
+    def __repr__(self):
+        """
+        Return a string representation of the virtual space for debugging.
+        """
+        return f"virtualSpace(size={self._size}, label='{self._label}')"
+
+
     def get_address(self, index: int) -> 'virtualAddress':
         """
         Get the virtual address at the specified index.
@@ -56,6 +63,13 @@ class virtualAddress:
         """
         return f" {self._virtual_space._label}[{self._index}]"
 
+    def __str__(self):
+        """
+        Return a string representation of the virtual address.
+        """
+        return f" {self._virtual_space._label}[{self._index}]"
+
+
     def get_index(self) -> int:
         """
         Get the index of the virtual address.
@@ -71,3 +85,8 @@ if __name__ == "__main__":
     address = vspace.get_address(2)
     print(address)
     print(f"Address index: {address.get_index()}")
+
+
+    vlist=[ vspace.get_address(2), vspace.get_address(3)]
+
+    print(str(vlist))

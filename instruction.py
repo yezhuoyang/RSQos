@@ -62,7 +62,6 @@ def get_clocktime(type: Instype) -> int:
 
 
 
-
 class instruction:
 
     """
@@ -73,6 +72,33 @@ class instruction:
         self._time=time
         self._clock_time=get_clocktime(type)
         self._qubitaddress=qubitaddress
+
+
+    def get_type(self) -> Instype:
+        """
+        Get the type of the instruction.
+        """
+        return self._type
+
+    def get_qubitaddress(self) -> List[virtualAddress]:
+        """
+        Get the list of qubit addresses associated with the instruction.
+        """
+        return self._qubitaddress
+
+    def get_time(self) -> int:
+        """
+        Get the time associated with the instruction.
+        """
+        return self._time
+
+
+    def get_clock_time(self) -> int:
+        """
+        Get the clock time associated with the instruction.
+        """
+        return self._clock_time
+
 
     def __str__(self):
         outputstr=""
@@ -87,14 +113,34 @@ class instruction:
                 outputstr+="Z"    
             case Instype.CNOT:
                 outputstr+="CNOT"
-            case Instype.T:
-                outputstr+="T"
             case Instype.RESET:
                 outputstr+="RESET"
             case Instype.MEASURE:
                 outputstr+="MEASURE"
-        outputstr+=" on qubit(" + str(self._qubitaddress) + ") at time " + str(self._time)
+        outputstr+=" on qubit(" + ", ".join(map(str, self._qubitaddress)) + ") at time " + str(self._time)
         return outputstr
+
+
+    def __repr__(self):
+        outputstr=""
+        match self._type:
+            case Instype.H:
+                outputstr+="H"
+            case Instype.X:
+                outputstr+="X"
+            case Instype.Y:
+                outputstr+="Y"
+            case Instype.Z:
+                outputstr+="Z"    
+            case Instype.CNOT:
+                outputstr+="CNOT"
+            case Instype.RESET:
+                outputstr+="RESET"
+            case Instype.MEASURE:
+                outputstr+="MEASURE"
+        outputstr+=" on qubit(" + ", ".join(map(str, self._qubitaddress)) + ") at time " + str(self._time)
+        return outputstr
+
 
 if __name__ == "__main__":
 

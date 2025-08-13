@@ -1,0 +1,6 @@
+#An example of the program with some system call
+#This language is still at a very high level, but not at the assembly level.
+syscall(vdata,ALLOCATE_DATA_QUBITS,3)  #Allocate 3 data qubits, the head of this virtual address is vdata[0]
+syscall(vsyn,ALLOCATE_SYNDROME_QUBITS,2)  #Allocate 2 syndrome qubits, the head of this virtual address is vdata[3]
+syscall(vdata,DEALLOCATE_DATA_QUBITS)  #Deallocate the data qubits
+syscall(vsyn,DEALLOCATE_SYNDROME_QUBITS)  #Deallocate the syndrome qubits
