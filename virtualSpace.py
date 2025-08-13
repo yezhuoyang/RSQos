@@ -21,6 +21,7 @@ class virtualSpace:
         """
         self._size = size
         self._label = label
+        self._addresses = [virtualAddress(self, i) for i in range(size)]
 
 
     def __str__(self):
@@ -41,7 +42,7 @@ class virtualSpace:
         Get the virtual address at the specified index.
         """
         if 0 <= index < self._size:
-            return virtualAddress(self, index)
+            return self._addresses[index]
         else:
             raise IndexError("Index out of bounds.")
 
@@ -63,11 +64,11 @@ class virtualAddress:
         """
         return f" {self._virtual_space._label}[{self._index}]"
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return a string representation of the virtual address.
         """
-        return f" {self._virtual_space._label}[{self._index}]"
+        return f"virtualAddress(virtual_space={self._virtual_space._label}, index={self._index})"
 
 
     def get_index(self) -> int:
