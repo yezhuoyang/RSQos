@@ -123,10 +123,14 @@ class process:
         if self._next_instruction_label < len(self._instruction_list):
             inst = self._instruction_list[self._next_instruction_label]
             self._executed[inst] = True
-            self._consumed_qpu_time += get_clocktime(inst.type)
+            if isinstance(inst,instruction):
+                self._consumed_qpu_time += get_clocktime(inst.get_type())
             self._next_instruction_label += 1
         else:
             self._is_done = True
+
+    def get_consumed_qpu_time(self) -> int:
+        return self._consumed_qpu_time
 
 
 

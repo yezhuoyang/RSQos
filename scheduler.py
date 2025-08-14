@@ -13,22 +13,19 @@ class Scheduler:
         self._hardware = hardware_instance
 
         self._qubit_num = hardware_instance.get_qubit_num()
-        self._current_avalible = { i: True for i in range(1, self._qubit_num + 1) }
-        self._mapped_to_syndrome = { i: False for i in range(1, self._qubit_num + 1) }
-        self._used_counter = { i: 0 for i in range(1, self._qubit_num + 1) }   # Count of how many process used each qubit. Syndrome qubit might be reused
+        self._current_avalible = { i: True for i in range(0, self._qubit_num + 1) }
+        self._mapped_to_syndrome = { i: False for i in range(0, self._qubit_num + 1) }
+        self._used_counter = { i: 0 for i in range(0, self._qubit_num + 1) }   # Count of how many process used each qubit. Syndrome qubit might be reused
         self._num_availble = self._qubit_num
         self._virtual_hardware_mapping = virtualHardwareMapping(hardware_instance)
         self._current_process_in_execution = []
 
 
-    def get_virtual_hardware_mapping(self):
+    def get_virtual_hardware_mapping(self) -> virtualHardwareMapping:
         """
         Get the virtual hardware mapping.
         """
-        for i in range(start, self._qubit_num + 1):
-            if self._current_avalible[i]:
-                return i
-        return None
+        return self._virtual_hardware_mapping
 
     def free_resources(self, process_instance: process):
         """
@@ -97,7 +94,7 @@ class Scheduler:
             self._current_avalible[next_free_index_] = False
             self._used_counter[next_free_index_] = 1
             self._num_availble -= 1
-            process_instance.map_virtual_to_physical(addr, next_free_index_)
+            self._virtual_hardware_mapping.add_mapping(addr, next_free_index_)
             next_free_index_=self.next_free_index(next_free_index_+1)
 
         next_free_index_=self.next_free_index(0)
@@ -106,20 +103,44 @@ class Scheduler:
             Greedy algorithm: Use available qubit until none are available
             Otherwise, use the syndrome qubit with the lowest usage count.
             """
-            if num_available > 0:
+            if self._num_availble > 0:
                 self._current_avalible[next_free_index_] = False
                 self._used_counter[next_free_index_] = 1
                 self._num_availble -= 1
                 self._mapped_to_syndrome[next_free_index_] = True
-                process_instance.map_virtual_to_physical(addr, next_free_index_)
+                self._virtual_hardware_mapping.add_mapping(addr, next_free_index_)
                 next_free_index_ = self.next_free_index(next_free_index_ + 1)
             else:
                 least_busy_qubit = self.least_busy_syndrome_qubit()
                 if least_busy_qubit != -1:
                     self._used_counter[least_busy_qubit] += 1
-                    process_instance.map_virtual_to_physical(addr, least_busy_qubit)
+                    self._virtual_hardware_mapping.add_mapping(addr, least_busy_qubit)
                 else:
                     assert False, "No available qubit found for syndrome mapping."
+
+
+    def baseline_scheduling(self):
+        """
+        Base line scheduling algorithm.
+        Naively allocate resources to processes in the order they arrive.
+        """
+        processes_stack = self._kernel.get_processes().copy()
+
+        num_process = len(processes_stack)
+        num_finish_process = 0
+        total_qpu_time = 0
+        for process_instance in processes_stack:
+            if self.have_enough_resources(process_instance):
+                self.allocate_resources(process_instance)
+            else:
+                assert False, "Process ask too many qubits!"
+
+            while not process_instance.is_done():
+                process_instance.execute_instruction()
+            self.free_resources(process_instance)
+            total_qpu_time += process_instance.get_consumed_qpu_time()
+
+        return total_qpu_time
 
 
     def schedule(self):
@@ -142,3 +163,49 @@ class Scheduler:
             3. Update process status.
             """
 
+
+
+if __name__ == "__main__":
+
+    vdata1 = virtualSpace(size=10, label="vdata1")
+    vsyn1 = virtualSpace(size=5, label="vsyn1", is_syndrome=True)
+
+    proc1 = process(processID=1,start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(size=3,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(size=3,processID=1))  # Allocate 2 syndrome qubits
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])  # CNOT operation
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])  # CNOT operation
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(2)])  # CNOT operation
+    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(vdata1 ,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(vsyn1,processID=1))  # Allocate 2 syndrome qubits
+
+
+    vdata2 = virtualSpace(size=10, label="vdata2")
+    vsyn2 = virtualSpace(size=5, label="vsyn2", is_syndrome=True)
+
+    proc2 = process(processID=2,start_time=3, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(size=3,processID=1))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(size=3,processID=1))  # Allocate 2 syndrome qubits
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(0)])  # CNOT operation
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(1)])  # CNOT operation
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(2)])  # CNOT operation
+    proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(vdata2 ,processID=1))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(vsyn2,processID=1))  # Allocate 2 syndrome qubits
+
+    #print(proc2)
+
+
+    kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+
+    virtual_hardware = virtualHardware(qubit_number=6, error_rate=0.001)
+
+
+    schedule_instance=Scheduler(kernel_instance,virtual_hardware)
+    time=schedule_instance.baseline_scheduling()
+
+    print(f"Total time {time}")
+    #print(kernel_instance)

@@ -72,6 +72,7 @@ class syscall_deallocate_data_qubits(syscall):
     def __init__(self, virtual_space: virtualSpace, processID: int = None):
         super().__init__(syscall_type=syscalltype.DEALLOCATE_DATA_QUBITS, processID=processID)
         self._virtual_space = virtual_space
+        self._size = virtual_space.get_size()
 
     def __str__(self):
         return f"DDQ: {self._syscall_type.name}, Virtual Space: {self._virtual_space}"
@@ -93,12 +94,13 @@ class syscall_deallocate_syndrome_qubits(syscall):
     """
     Initialize a syscall for deallocating syndrome qubits.
     """
-    def __init__(self, address: List[int], processID: int = None):
+    def __init__(self, virtual_space: virtualSpace, processID: int = None):
         super().__init__(syscall_type=syscalltype.DEALLOCATE_SYNDROME_QUBITS, processID=processID)
-        self._address = address
+        self._virtual_space = virtual_space
+        self._size = virtual_space.get_size()
 
     def __str__(self):
-        return f"DSQ: {self._syscall_type.name}, Address: {self._address}"
+        return f"DSQ: {self._syscall_type.name}, Space: {self._virtual_space}"
 
 
 
