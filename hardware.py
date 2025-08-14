@@ -14,6 +14,8 @@ class virtualHardware:
         self._physical_qubits = qubit_number
         self._error_rate = error_rate
 
+    def get_qubit_num(self) -> int:
+        return self._physical_qubits
 
 
 class virtualHardwareMapping:
@@ -25,6 +27,8 @@ class virtualHardwareMapping:
         """
         self._hardware = hardware_instance
         self._mapping = {}
+
+
 
 
     def add_mapping(self, virtual_address: virtualAddress, physical_qubit: int):
@@ -40,6 +44,8 @@ class virtualHardwareMapping:
         """
         Get the physical qubit mapped to a virtual address.
         """
+        if virtual_address not in self._mapping:
+            assert False, "Virtual address not mapped to any physical qubit."
         return self._mapping.get(virtual_address)
 
         # For example: self._mapping[virtual_address] = physical_qubit
