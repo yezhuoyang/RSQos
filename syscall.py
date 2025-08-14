@@ -21,7 +21,29 @@ class syscalltype(Enum):
     DEALLOCATE_DATA_QUBITS = 3
     ALLOCATE_SYNDROME_QUBITS = 4
     DEALLOCATE_SYNDROME_QUBITS = 5
+    ALLOCATE_T_FACTORY = 6
+    DEALLOCATE_T_FACTORY = 7
 
+
+def get_syscall_time(call: 'syscall')-> int:
+    """
+    Get the clock time associated with a given syscall type.
+    
+    Args:
+        call (syscall): The syscall instance.
+    
+    Returns:
+        int: The clock time for the syscall type.
+    """
+    match call._syscall_type:
+        case syscalltype.MAGIC_STATE_DISTILLATION:
+            return 1000  # Example time for magic state distillation
+        case syscalltype.ALLOCATE_DATA_QUBITS | syscalltype.ALLOCATE_SYNDROME_QUBITS | syscalltype.ALLOCATE_T_FACTORY:
+            return 500  # Example time for allocation syscalls
+        case syscalltype.DEALLOCATE_DATA_QUBITS | syscalltype.DEALLOCATE_SYNDROME_QUBITS | syscalltype.DEALLOCATE_T_FACTORY:
+            return 1  # Example time for deallocation syscalls
+        case _:
+            raise ValueError("Unknown syscall type")
 
 
 class syscall:
@@ -104,6 +126,31 @@ class syscall_deallocate_syndrome_qubits(syscall):
 
 
 
+
+
+class syscall_allocate_T_factory(syscall):
+    """
+    Initialize a T gate factory.
+    """
+    def __init__(self, size: int, processID: int = None):
+        super().__init__(syscall_type=syscalltype.ALLOCATE_T_FACTORY, processID=processID)
+        self._size = size
+
+    def __str__(self):
+        return f"ATF: {self._syscall_type.name}, Size: {self._size}"
+
+
+class syscall_deallocate_T_factory(syscall):
+    """
+    Initialize a syscall for deallocating a T gate factory.
+    """
+    def __init__(self, virtual_space: virtualSpace, processID: int = None):
+        super().__init__(syscall_type=syscalltype.DEALLOCATE_T_FACTORY, processID=processID)
+        self._virtual_space = virtual_space
+        self._size = virtual_space.get_size()
+
+    def __str__(self):
+        return f"DTF: {self._syscall_type.name}, Space: {self._virtual_space}"
 
 
 

@@ -15,7 +15,7 @@ Example:
 class virtualSpace:
 
 
-    def __init__(self, size: int, label: str = "default", is_syndrome=False):
+    def __init__(self, size: int, label: str = "default", is_syndrome=False, is_T_factory=False):
         """
         Initialize a new virtual space with a given maximum size.
         """
@@ -24,10 +24,13 @@ class virtualSpace:
         self._addresses = [virtualAddress(self, i, is_syndrome) for i in range(size)]
         self._is_allocated = [False] * size
         self._is_syndrome = is_syndrome
-
+        self._is_T_factory = is_T_factory
 
     def is_syndrome(self) -> bool:
         return self._is_syndrome
+    
+    def is_T_factory(self) -> bool:
+        return self._is_T_factory
 
     def get_size(self) -> int:
         return self._size
@@ -101,13 +104,14 @@ class virtualSpace:
 class virtualAddress:
 
 
-    def __init__(self, virtual_space: virtualSpace, index: int, is_syndrome=False):
+    def __init__(self, virtual_space: virtualSpace, index: int, is_syndrome=False, is_T_factory=False):
         """
         Initialize a new virtual address with a given index.
         """
         self._index = index
         self._virtual_space = virtual_space
         self._is_syndrome =  is_syndrome
+        self._is_T_factory = is_T_factory
 
     def is_syndrome(self) -> bool:
         return self._is_syndrome
