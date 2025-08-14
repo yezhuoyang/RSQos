@@ -37,6 +37,9 @@ class process:
         self._virtual_data_addresses = []  # List to hold virtual data qubit addresses allocated to this process
         self._virtual_syndrome_addresses = []  # List to hold virtual syndrome qubit addresses allocated to this process        
 
+    def get_start_time(self) -> int:
+        return self._start_time
+
     def get_num_data_qubits(self) -> int:
         """
         Get the number of data qubits used by the process.
@@ -48,6 +51,7 @@ class process:
         Get the number of syndrome qubits used by the process.
         """
         return self._num_syndrome_qubits
+
 
     def add_instruction(self, type:Instype, qubitaddress:List[virtualAddress]):
         """
@@ -119,15 +123,17 @@ class process:
         """
         return self._is_done
 
-    def execute_instruction(self):
+    def execute_instruction(self) -> instruction:
         if self._next_instruction_label < len(self._instruction_list):
             inst = self._instruction_list[self._next_instruction_label]
             self._executed[inst] = True
+            self._next_instruction_label += 1
             if isinstance(inst,instruction):
                 self._consumed_qpu_time += get_clocktime(inst.get_type())
-            self._next_instruction_label += 1
+                return inst
         else:
             self._is_done = True
+        return None
 
     def get_consumed_qpu_time(self) -> int:
         return self._consumed_qpu_time

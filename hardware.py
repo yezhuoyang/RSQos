@@ -28,7 +28,11 @@ class virtualHardwareMapping:
         self._hardware = hardware_instance
         self._mapping = {}
 
+    def __str__(self):
+        return f"virtualHardwareMapping({self._mapping})"
 
+    def __repr__(self):
+        return f"virtualHardwareMapping({self._mapping})"
 
 
     def add_mapping(self, virtual_address: virtualAddress, physical_qubit: int):
@@ -78,12 +82,12 @@ class virtualHardwareMapping:
         return circuit
 
 
-    def transpile(self,process_instance):
+    def transpile(self,instruction_list: List[instruction]):
         """
         Transpile the process instructions to stim program given the mapping
         """
         circuit = stim.Circuit()
-        for inst in process_instance._instruction_list:
+        for inst in instruction_list:
             if isinstance(inst, instruction):
                 match inst.get_type():
                     case Instype.CNOT:
@@ -138,6 +142,6 @@ if __name__ == "__main__":
     virtual_hardware_mapping.add_mapping(vsyn1.get_address(0), 2)
     virtual_hardware_mapping.add_mapping(vsyn1.get_address(1), 3)
 
-    stim_circuit = virtual_hardware_mapping.transpile(process_instance1)
+    #stim_circuit = virtual_hardware_mapping.transpile(process_instance1)
 
     print(stim_circuit)

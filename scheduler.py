@@ -123,12 +123,15 @@ class Scheduler:
         """
         Base line scheduling algorithm.
         Naively allocate resources to processes in the order they arrive.
+        The result of scheduling is a list of instruction which contain the instructions
+        of all processes
         """
         processes_stack = self._kernel.get_processes().copy()
 
         num_process = len(processes_stack)
         num_finish_process = 0
         total_qpu_time = 0
+        final_inst_list = []
         for process_instance in processes_stack:
             if self.have_enough_resources(process_instance):
                 self.allocate_resources(process_instance)
@@ -136,11 +139,13 @@ class Scheduler:
                 assert False, "Process ask too many qubits!"
 
             while not process_instance.is_done():
-                process_instance.execute_instruction()
+                inst=process_instance.execute_instruction()
+                if isinstance(inst,instruction):
+                    final_inst_list.append(inst)
             self.free_resources(process_instance)
             total_qpu_time += process_instance.get_consumed_qpu_time()
 
-        return total_qpu_time
+        return total_qpu_time,final_inst_list
 
 
     def schedule(self):
@@ -150,10 +155,14 @@ class Scheduler:
         The output is a single process instance with virtual hardware mapping.
         """
         processes_stack = self._kernel.get_processes().copy()
-
+        processes_stack.sort(key=lambda x: x.get_start_time())  # Sort processes by start time
         num_process = len(processes_stack)
         num_finish_process = 0
+        total_qpu_time = 0
+        final_inst_list = []
+        process_finish_map = {i: False for i in processes_stack}
 
+        active_processes = []
         while num_finish_process < num_process:
             """
             Greedy algorithm to allocate hardware resources to processes.
@@ -162,11 +171,44 @@ class Scheduler:
             2. Allocate resources.
             3. Update process status.
             """
+            for process_instance in processes_stack:
+                if not process_finish_map[process_instance]:
+                    if process_instance not in active_processes:
+                        if self.have_enough_resources(process_instance):
+                            self.allocate_resources(process_instance)
+                            active_processes.append(process_instance)
+
+            """
+            Execute instructions for active processes.
+            Update the final_inst_list.
+            These process run in parallel
+            """
+            cost_time = 0
+            for process_instance in active_processes:
+                inst = process_instance.execute_instruction()
+                if isinstance(inst, instruction):
+                    final_inst_list.append(inst)
+                    tmp_time= get_clocktime(inst.get_type())
+                    cost_time = max(cost_time, tmp_time)
+            total_qpu_time += cost_time
+
+
+            """
+            Free resources for finished processes.
+            """
+            for process_instance in active_processes:
+                if process_instance.is_done():
+                    self.free_resources(process_instance)
+                    process_finish_map[process_instance] = True
+                    num_finish_process += 1
+                    active_processes.remove(process_instance)
+
+
+        return total_qpu_time,final_inst_list
 
 
 
-if __name__ == "__main__":
-
+def generate_example():
     vdata1 = virtualSpace(size=10, label="vdata1")
     vsyn1 = virtualSpace(size=5, label="vsyn1", is_syndrome=True)
 
@@ -195,17 +237,309 @@ if __name__ == "__main__":
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(vsyn2,processID=1))  # Allocate 2 syndrome qubits
 
     #print(proc2)
-
-
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
+    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001)
 
-    virtual_hardware = virtualHardware(qubit_number=6, error_rate=0.001)
+    return kernel_instance, virtual_hardware
 
 
+def generate_example1():
+    vdata1 = virtualSpace(size=10, label="vdata1")
+    vsyn1 = virtualSpace(size=5, label="vsyn1", is_syndrome=True)
+
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1.add_syscall(syscall_allocate_data_qubits(size=3, processID=1))
+    proc1.add_syscall(syscall_allocate_syndrome_qubits(size=3, processID=1))
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
+    proc1.add_syscall(syscall_deallocate_data_qubits(vdata1, processID=1))
+    proc1.add_syscall(syscall_deallocate_syndrome_qubits(vsyn1, processID=1))
+
+    vdata2 = virtualSpace(size=12, label="vdata2")
+    vsyn2 = virtualSpace(size=6, label="vsyn2", is_syndrome=True)
+
+    proc2 = process(processID=2, start_time=1, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2.add_syscall(syscall_allocate_data_qubits(size=4, processID=2))
+    proc2.add_syscall(syscall_allocate_syndrome_qubits(size=2, processID=2))
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(1)])
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(2), vsyn2.get_address(0)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)])
+    proc2.add_syscall(syscall_deallocate_data_qubits(vdata2, processID=2))
+    proc2.add_syscall(syscall_deallocate_syndrome_qubits(vsyn2, processID=2))
+
+    vdata3 = virtualSpace(size=8, label="vdata3")
+    vsyn3 = virtualSpace(size=4, label="vsyn3", is_syndrome=True)
+
+    proc3 = process(processID=3, start_time=2, vdataspace=vdata3, vsyndromespace=vsyn3)
+    proc3.add_syscall(syscall_allocate_data_qubits(size=2, processID=3))
+    proc3.add_syscall(syscall_allocate_syndrome_qubits(size=2, processID=3))
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(0), vsyn3.get_address(0)])
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])
+    proc3.add_syscall(syscall_deallocate_data_qubits(vdata3, processID=3))
+    proc3.add_syscall(syscall_deallocate_syndrome_qubits(vsyn3, processID=3))
+
+    kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 
+                                     'max_physical_qubits': 10000, 
+                                     'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    kernel_instance.add_process(proc3)
+    virtual_hardware = virtualHardware(qubit_number=12, error_rate=0.001)
+    return kernel_instance, virtual_hardware
+
+
+def generate_example2():
+    vdata1 = virtualSpace(size=14, label="vdata1")
+    vsyn1 = virtualSpace(size=7, label="vsyn1", is_syndrome=True)
+
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1.add_syscall(syscall_allocate_data_qubits(size=5, processID=1))
+    proc1.add_syscall(syscall_allocate_syndrome_qubits(size=3, processID=1))
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
+    proc1.add_syscall(syscall_deallocate_data_qubits(vdata1, processID=1))
+    proc1.add_syscall(syscall_deallocate_syndrome_qubits(vsyn1, processID=1))
+
+    vdata2 = virtualSpace(size=10, label="vdata2")
+    vsyn2 = virtualSpace(size=5, label="vsyn2", is_syndrome=True)
+
+    proc2 = process(processID=2, start_time=1, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2.add_syscall(syscall_allocate_data_qubits(size=3, processID=2))
+    proc2.add_syscall(syscall_allocate_syndrome_qubits(size=3, processID=2))
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(2), vsyn2.get_address(2)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(2)])
+    proc2.add_syscall(syscall_deallocate_data_qubits(vdata2, processID=2))
+    proc2.add_syscall(syscall_deallocate_syndrome_qubits(vsyn2, processID=2))
+
+    vdata3 = virtualSpace(size=9, label="vdata3")
+    vsyn3 = virtualSpace(size=4, label="vsyn3", is_syndrome=True)
+
+    proc3 = process(processID=3, start_time=3, vdataspace=vdata3, vsyndromespace=vsyn3)
+    proc3.add_syscall(syscall_allocate_data_qubits(size=2, processID=3))
+    proc3.add_syscall(syscall_allocate_syndrome_qubits(size=2, processID=3))
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(0), vsyn3.get_address(0)])
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])
+    proc3.add_syscall(syscall_deallocate_data_qubits(vdata3, processID=3))
+    proc3.add_syscall(syscall_deallocate_syndrome_qubits(vsyn3, processID=3))
+
+    kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 
+                                     'max_physical_qubits': 10000, 
+                                     'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    kernel_instance.add_process(proc3)
+    virtual_hardware = virtualHardware(qubit_number=14, error_rate=0.0015)
+    return kernel_instance, virtual_hardware
+
+
+
+
+
+
+
+def generate_example3():
+    vdata1 = virtualSpace(size=8, label="vdata1")
+    vsyn1 = virtualSpace(size=4, label="vsyn1", is_syndrome=True)
+
+    proc1 = process(1, 0, vdata1, vsyn1)
+    proc1.add_syscall(syscall_allocate_data_qubits(2, 1))
+    proc1.add_syscall(syscall_allocate_syndrome_qubits(2, 1))
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
+    proc1.add_syscall(syscall_deallocate_data_qubits(vdata1, 1))
+    proc1.add_syscall(syscall_deallocate_syndrome_qubits(vsyn1, 1))
+
+    vdata2 = virtualSpace(size=10, label="vdata2")
+    vsyn2 = virtualSpace(size=5, label="vsyn2", is_syndrome=True)
+
+    proc2 = process(2, 1, vdata2, vsyn2)
+    proc2.add_syscall(syscall_allocate_data_qubits(3, 2))
+    proc2.add_syscall(syscall_allocate_syndrome_qubits(3, 2))
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(1)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)])
+    proc2.add_syscall(syscall_deallocate_data_qubits(vdata2, 2))
+    proc2.add_syscall(syscall_deallocate_syndrome_qubits(vsyn2, 2))
+
+    vdata3 = virtualSpace(size=12, label="vdata3")
+    vsyn3 = virtualSpace(size=6, label="vsyn3", is_syndrome=True)
+
+    proc3 = process(3, 3, vdata3, vsyn3)
+    proc3.add_syscall(syscall_allocate_data_qubits(4, 3))
+    proc3.add_syscall(syscall_allocate_syndrome_qubits(2, 3))
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(2), vsyn3.get_address(0)])
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])
+    proc3.add_syscall(syscall_deallocate_data_qubits(vdata3, 3))
+    proc3.add_syscall(syscall_deallocate_syndrome_qubits(vsyn3, 3))
+
+    kernel_instance = Kernel({'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    kernel_instance.add_process(proc3)
+    virtual_hardware = virtualHardware(12, 0.002)
+    return kernel_instance, virtual_hardware
+
+
+def generate_example4():
+    vdata1 = virtualSpace(size=15, label="vdata1")
+    vsyn1 = virtualSpace(size=7, label="vsyn1", is_syndrome=True)
+
+    proc1 = process(1, 0, vdata1, vsyn1)
+    proc1.add_syscall(syscall_allocate_data_qubits(5, 1))
+    proc1.add_syscall(syscall_allocate_syndrome_qubits(3, 1))
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(4), vsyn1.get_address(1)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])
+    proc1.add_syscall(syscall_deallocate_data_qubits(vdata1, 1))
+    proc1.add_syscall(syscall_deallocate_syndrome_qubits(vsyn1, 1))
+
+    vdata2 = virtualSpace(size=9, label="vdata2")
+    vsyn2 = virtualSpace(size=5, label="vsyn2", is_syndrome=True)
+
+    proc2 = process(2, 2, vdata2, vsyn2)
+    proc2.add_syscall(syscall_allocate_data_qubits(3, 2))
+    proc2.add_syscall(syscall_allocate_syndrome_qubits(2, 2))
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(2)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(2)])
+    proc2.add_syscall(syscall_deallocate_data_qubits(vdata2, 2))
+    proc2.add_syscall(syscall_deallocate_syndrome_qubits(vsyn2, 2))
+
+    vdata3 = virtualSpace(size=10, label="vdata3")
+    vsyn3 = virtualSpace(size=6, label="vsyn3", is_syndrome=True)
+
+    proc3 = process(3, 4, vdata3, vsyn3)
+    proc3.add_syscall(syscall_allocate_data_qubits(4, 3))
+    proc3.add_syscall(syscall_allocate_syndrome_qubits(2, 3))
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(2), vsyn3.get_address(3)])
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(3)])
+    proc3.add_syscall(syscall_deallocate_data_qubits(vdata3, 3))
+    proc3.add_syscall(syscall_deallocate_syndrome_qubits(vsyn3, 3))
+
+    kernel_instance = Kernel({'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    kernel_instance.add_process(proc3)
+    virtual_hardware = virtualHardware(15, 0.001)
+    return kernel_instance, virtual_hardware
+
+
+def generate_example5():
+    vdata1 = virtualSpace(size=11, label="vdata1")
+    vsyn1 = virtualSpace(size=5, label="vsyn1", is_syndrome=True)
+
+    proc1 = process(1, 1, vdata1, vsyn1)
+    proc1.add_syscall(syscall_allocate_data_qubits(3, 1))
+    proc1.add_syscall(syscall_allocate_syndrome_qubits(2, 1))
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(1)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])
+    proc1.add_syscall(syscall_deallocate_data_qubits(vdata1, 1))
+    proc1.add_syscall(syscall_deallocate_syndrome_qubits(vsyn1, 1))
+
+    vdata2 = virtualSpace(size=12, label="vdata2")
+    vsyn2 = virtualSpace(size=6, label="vsyn2", is_syndrome=True)
+
+    proc2 = process(2, 2, vdata2, vsyn2)
+    proc2.add_syscall(syscall_allocate_data_qubits(4, 2))
+    proc2.add_syscall(syscall_allocate_syndrome_qubits(3, 2))
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(2), vsyn2.get_address(2)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(2)])
+    proc2.add_syscall(syscall_deallocate_data_qubits(vdata2, 2))
+    proc2.add_syscall(syscall_deallocate_syndrome_qubits(vsyn2, 2))
+
+    vdata3 = virtualSpace(size=14, label="vdata3")
+    vsyn3 = virtualSpace(size=7, label="vsyn3", is_syndrome=True)
+
+    proc3 = process(3, 4, vdata3, vsyn3)
+    proc3.add_syscall(syscall_allocate_data_qubits(5, 3))
+    proc3.add_syscall(syscall_allocate_syndrome_qubits(3, 3))
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(4), vsyn3.get_address(1)])
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(1)])
+    proc3.add_syscall(syscall_deallocate_data_qubits(vdata3, 3))
+    proc3.add_syscall(syscall_deallocate_syndrome_qubits(vsyn3, 3))
+
+    kernel_instance = Kernel({'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    kernel_instance.add_process(proc3)
+    virtual_hardware = virtualHardware(14, 0.0012)
+    return kernel_instance, virtual_hardware
+
+
+def generate_example6():
+    vdata1 = virtualSpace(size=9, label="vdata1")
+    vsyn1 = virtualSpace(size=4, label="vsyn1", is_syndrome=True)
+
+    proc1 = process(1, 0, vdata1, vsyn1)
+    proc1.add_syscall(syscall_allocate_data_qubits(3, 1))
+    proc1.add_syscall(syscall_allocate_syndrome_qubits(2, 1))
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
+    proc1.add_syscall(syscall_deallocate_data_qubits(vdata1, 1))
+    proc1.add_syscall(syscall_deallocate_syndrome_qubits(vsyn1, 1))
+
+    vdata2 = virtualSpace(size=10, label="vdata2")
+    vsyn2 = virtualSpace(size=5, label="vsyn2", is_syndrome=True)
+
+    proc2 = process(2, 1, vdata2, vsyn2)
+    proc2.add_syscall(syscall_allocate_data_qubits(4, 2))
+    proc2.add_syscall(syscall_allocate_syndrome_qubits(3, 2))
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(3), vsyn2.get_address(2)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(2)])
+    proc2.add_syscall(syscall_deallocate_data_qubits(vdata2, 2))
+    proc2.add_syscall(syscall_deallocate_syndrome_qubits(vsyn2, 2))
+
+    vdata3 = virtualSpace(size=11, label="vdata3")
+    vsyn3 = virtualSpace(size=5, label="vsyn3", is_syndrome=True)
+
+    proc3 = process(3, 3, vdata3, vsyn3)
+    proc3.add_syscall(syscall_allocate_data_qubits(3, 3))
+    proc3.add_syscall(syscall_allocate_syndrome_qubits(2, 3))
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(0), vsyn3.get_address(1)])
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(1)])
+    proc3.add_syscall(syscall_deallocate_data_qubits(vdata3, 3))
+    proc3.add_syscall(syscall_deallocate_syndrome_qubits(vsyn3, 3))
+
+    kernel_instance = Kernel({'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    kernel_instance.add_process(proc3)
+    virtual_hardware = virtualHardware(11, 0.0011)
+    return kernel_instance, virtual_hardware
+
+
+
+if __name__ == "__main__":
+
+    kernel_instance, virtual_hardware = generate_example6()
     schedule_instance=Scheduler(kernel_instance,virtual_hardware)
-    time=schedule_instance.baseline_scheduling()
+    time1, inst_list1=schedule_instance.baseline_scheduling()
 
-    print(f"Total time {time}")
-    #print(kernel_instance)
+
+
+
+    kernel_instance, virtual_hardware = generate_example6()
+    schedule_instance=Scheduler(kernel_instance,virtual_hardware)
+    time2, inst_list2=schedule_instance.schedule()
+
+
+    print("Baseline: {}".format(time1))
+
+
+    print("Our: {}".format(time2))
+    # #print(kernel_instance)
+
+
+
+
+    # mapping = schedule_instance.get_virtual_hardware_mapping()
+
+
+    # print("Mapping after scheduling:")
+
+    # print(mapping)
+
+
+    # stim_circuit = mapping.transpile(inst_list)
+
+    # print(stim_circuit)
