@@ -5,6 +5,14 @@ from virtualSpace import virtualSpace
 from syscall import *
 
 
+class ProcessStatus(Enum):
+    RUNNING = 1
+    WAIT_FOR_ANSILLA = 2
+    WAIT_FOR_T_GATE = 3
+    FINISHED = 4
+
+
+
 
 class process:
 

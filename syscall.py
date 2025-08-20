@@ -126,8 +126,6 @@ class syscall_deallocate_syndrome_qubits(syscall):
 
 
 
-
-
 class syscall_allocate_T_factory(syscall):
     """
     Initialize a T gate factory.
