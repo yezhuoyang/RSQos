@@ -1,11 +1,12 @@
 #Fault-tolerant process on a fault-tolerant quantum computer
 
 from instruction import *
-from virtualSpace import virtualSpace
+from virtualSpace import virtualSpace, virtualAddress
 from syscall import *
 
 
 class ProcessStatus(Enum):
+    WAIT_TO_START = 0
     RUNNING = 1
     WAIT_FOR_ANSILLA = 2
     WAIT_FOR_T_GATE = 3
@@ -22,6 +23,7 @@ class process:
         self._instruction_list = []
         self._syscall_list = []
         self._current_time = start_time
+        self._status = ProcessStatus.WAIT_TO_START
         """
         The virtual data space, and virtual syndrome qubit space allocated to this process by the OS
         """
@@ -45,6 +47,24 @@ class process:
         self._virtual_data_addresses = []  # List to hold virtual data qubit addresses allocated to this process
         self._virtual_syndrome_addresses = []  # List to hold virtual syndrome qubit addresses allocated to this process        
 
+
+    def parse_from_stim_program(self, stim_program):
+        """
+        Parse a stim program and add instructions to the process.
+        This is a placeholder for future implementation.
+        """
+        raise NotImplementedError("This method needs to be implemented for parsing stim programs.")
+
+
+    def parse_from_qasm_program(self, qasm_program):
+        """
+        Parse a QASM program and add instructions to the process.
+        This is a placeholder for future implementation.
+        """
+        raise NotImplementedError("This method needs to be implemented for parsing QASM programs.")
+
+
+
     def get_start_time(self) -> int:
         return self._start_time
 
@@ -67,7 +87,7 @@ class process:
         """
         time = self._current_time
         self._current_time += get_clocktime(type)  # Increment time for the next instruction 
-        inst=instruction(type, qubitaddress, time)
+        inst=instruction(type, qubitaddress, self._processID,time)
         self._instruction_list.append(inst)
         self._executed[inst] = False
         for addr in qubitaddress:
@@ -131,16 +151,27 @@ class process:
         """
         return self._is_done
 
-    def execute_instruction(self) -> instruction:
+    def execute_instruction(self, hardwaretime=0) -> instruction:
+        """
+        Virtually execute the next instruction in the process.
+        This method help the scheduling algorithm to make decisions.
+        Meanwhile, it also updates the scheduled hardware time.
+        """
         if self._next_instruction_label < len(self._instruction_list):
+            if self._next_instruction_label == len(self._instruction_list)-1:
+                self._is_done = True
+                self._status = ProcessStatus.FINISHED
             inst = self._instruction_list[self._next_instruction_label]
             self._executed[inst] = True
             self._next_instruction_label += 1
-            if isinstance(inst,instruction):
+            if isinstance(inst, syscall):
+                inst.set_scheduled_time(hardwaretime)
+                self._consumed_qpu_time += get_syscall_time(inst)
+                return inst
+            elif isinstance(inst, instruction):
+                inst.set_scheduled_time(hardwaretime)
                 self._consumed_qpu_time += get_clocktime(inst.get_type())
                 return inst
-        else:
-            self._is_done = True
         return None
 
     def get_consumed_qpu_time(self) -> int:

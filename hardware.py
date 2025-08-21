@@ -49,13 +49,24 @@ class virtualHardwareMapping:
         Get the physical qubit mapped to a virtual address.
         """
         if virtual_address not in self._mapping:
-            assert False, "Virtual address not mapped to any physical qubit."
+            return -1
         return self._mapping.get(virtual_address)
 
         # For example: self._mapping[virtual_address] = physical_qubit
 
 
-    def transpile(self,process_instance):
+    def transpile_to_qasm(self, process_instance):
+        """
+        Transpile the process instructions to QASM program given the mapping
+        """
+        qasm_program = ""
+        for inst in process_instance._instruction_list:
+            pass
+        return qasm_program
+
+
+
+    def transpile_to_stim(self,process_instance):
         """
         Transpile the process instructions to stim program given the mapping
         """
@@ -82,7 +93,7 @@ class virtualHardwareMapping:
         return circuit
 
 
-    def transpile(self,instruction_list: List[instruction]):
+    def transpile_to_stim(self,instruction_list: List[instruction]):
         """
         Transpile the process instructions to stim program given the mapping
         """

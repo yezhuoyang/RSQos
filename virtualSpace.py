@@ -126,7 +126,7 @@ class virtualAddress:
         """
         Return a string representation of the virtual address.
         """
-        return f"virtualAddress(virtual_space={self._virtual_space._label}, index={self._index})"
+        return f" {self._virtual_space._label}[{self._index}]"
 
 
     def get_index(self) -> int:

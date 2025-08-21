@@ -139,11 +139,13 @@ class Scheduler:
                 assert False, "Process ask too many qubits!"
 
             while not process_instance.is_done():
-                inst=process_instance.execute_instruction()
-                if isinstance(inst,instruction):
-                    final_inst_list.append(inst)
+                inst=process_instance.execute_instruction(total_qpu_time)
+                if isinstance(inst, instruction):
+                    total_qpu_time += get_clocktime(inst.get_type())
+                else:
+                    total_qpu_time += get_syscall_time(inst)
+                final_inst_list.append(inst)
             self.free_resources(process_instance)
-            total_qpu_time += process_instance.get_consumed_qpu_time()
 
         return total_qpu_time,final_inst_list
 
@@ -208,33 +210,74 @@ class Scheduler:
 
 
 
+
+    def print_instruction_list(self, inst_list):
+        """
+        Print the instruction list in an organized and clean format.
+        For example:
+            P1(t=5):  CNOT qubit 0 (->vspace[3]),  1 (->vspace[4])
+            P1(t=6):  Syscall MAGIC_STATE_DISTILLATION qubit 0 (->vTspace[0]), 1 (->vTspace[1]), ...
+        """
+        for inst in inst_list:
+            if isinstance(inst, instruction):
+                process_id = inst.get_processID()
+                inst_name = get_gate_type_name(inst.get_type())
+                inst_time = inst.get_scheduled_time()
+                addresses = inst.get_qubitaddress()
+
+                mapped_addresses = [
+                    f"{self._virtual_hardware_mapping.get_physical_qubit(addr)} (->{addr})"
+                    for addr in addresses
+                ]
+                addr_str = ", ".join(mapped_addresses)
+                print(f"P{process_id}(t={inst_time}): {inst_name} qubit {addr_str}")
+
+            elif isinstance(inst, syscall):
+                process_id = inst.get_processID()
+                inst_name = get_syscall_type_name(inst)
+                inst_time = inst.get_scheduled_time()
+                addresses = inst.get_address()
+
+                mapped_addresses = [
+                    f"{self._virtual_hardware_mapping.get_physical_qubit(addr)} (->{addr})"
+                    for addr in addresses
+                ]
+                addr_str = ", ".join(mapped_addresses)
+                print(f"P{process_id}(t={inst_time}): Syscall {inst_name} qubit {addr_str}")
+
+            else:
+                print("Unknown instruction type.")
+
+
 def generate_example():
     vdata1 = virtualSpace(size=10, label="vdata1")
+    vdata1.allocate_range(0,2)
     vsyn1 = virtualSpace(size=5, label="vsyn1", is_syndrome=True)
-
+    vsyn1.allocate_range(0,2)
     proc1 = process(processID=1,start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
-    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(size=3,processID=1))  # Allocate 2 data qubits
-    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(size=3,processID=1))  # Allocate 2 syndrome qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])  # CNOT operation
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])  # CNOT operation
     proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(2)])  # CNOT operation
-    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(vdata1 ,processID=1))  # Allocate 2 data qubits
-    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(vsyn1,processID=1))  # Allocate 2 syndrome qubits
+    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
 
 
     vdata2 = virtualSpace(size=10, label="vdata2")
+    vdata2.allocate_range(0,2)
     vsyn2 = virtualSpace(size=5, label="vsyn2", is_syndrome=True)
-
+    vsyn2.allocate_range(0,2)
     proc2 = process(processID=2,start_time=3, vdataspace=vdata2, vsyndromespace=vsyn2)
-    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(size=3,processID=1))  # Allocate 2 data qubits
-    proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(size=3,processID=1))  # Allocate 2 syndrome qubits
+    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1),vsyn2.get_address(2)],size=3,processID=2))  # Allocate 2 syndrome qubits
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(0)])  # CNOT operation
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(1)])  # CNOT operation
     proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(2)])  # CNOT operation
-    proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(vdata2 ,processID=1))  # Allocate 2 data qubits
-    proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(vsyn2,processID=1))  # Allocate 2 syndrome qubits
+    proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3 ,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1),vsyn2.get_address(2)],size=3,processID=2))  # Allocate 2 syndrome qubits
 
     #print(proc2)
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
@@ -511,14 +554,22 @@ def generate_example6():
 
 if __name__ == "__main__":
 
-    kernel_instance, virtual_hardware = generate_example6()
+    kernel_instance, virtual_hardware = generate_example()
     schedule_instance=Scheduler(kernel_instance,virtual_hardware)
     time1, inst_list1=schedule_instance.baseline_scheduling()
 
 
 
 
-    kernel_instance, virtual_hardware = generate_example6()
+    mapping = schedule_instance.get_virtual_hardware_mapping()
+
+
+   #print("Mapping after scheduling:")
+
+    #print(mapping)
+
+
+    kernel_instance, virtual_hardware = generate_example()
     schedule_instance=Scheduler(kernel_instance,virtual_hardware)
     time2, inst_list2=schedule_instance.schedule()
 
@@ -527,17 +578,12 @@ if __name__ == "__main__":
 
 
     print("Our: {}".format(time2))
-    # #print(kernel_instance)
+    #print(kernel_instance)
 
 
+    schedule_instance.print_instruction_list(inst_list2)
 
 
-    # mapping = schedule_instance.get_virtual_hardware_mapping()
-
-
-    # print("Mapping after scheduling:")
-
-    # print(mapping)
 
 
     # stim_circuit = mapping.transpile(inst_list)

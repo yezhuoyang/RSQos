@@ -61,17 +61,56 @@ def get_clocktime(type: Instype) -> int:
 
 
 
+def get_gate_type_name(type: Instype) -> str:
+    """
+    Get the name of the gate type.
+    
+    Args:
+        type (Instype): The type of the instruction.
+    
+    Returns:
+        str: The name of the instruction type.
+    """
+    match type:
+        case Instype.H:
+            return "H"
+        case Instype.X:
+            return "X"  
+        case Instype.Y:
+            return "Y"
+        case Instype.Z:
+            return "Z"
+        case Instype.CNOT:
+            return "CNOT"
+        case Instype.RESET:
+            return "RESET"
+        case Instype.MEASURE:
+            return "MEASURE"
+        case _:
+            raise ValueError("Unknown instruction type")
+
+
+
 
 class instruction:
 
     """
     Initialize a new instruction.
     """
-    def __init__(self, type:Instype, qubitaddress:List[virtualAddress],time: int):
+    def __init__(self, type:Instype, qubitaddress:List[virtualAddress],processID: int,time: int):
         self._type=type
-        self._time=time
+        self._time=time # This is the tim when the instruction is executed in the virtual machine
+        self._scheduled_time=None  # This is the real time an instruction is performed in hardware after scheduling
         self._clock_time=get_clocktime(type)
         self._qubitaddress=qubitaddress
+        self._processID=processID
+
+
+    def get_processID(self) -> int:
+        """
+        Get the process ID associated with the instruction.
+        """
+        return self._processID
 
 
     def get_type(self) -> Instype:
@@ -86,9 +125,33 @@ class instruction:
         """
         return self._qubitaddress
 
+
+    def get_scheduled_time(self) -> int:
+        """
+        Get the scheduled time for the instruction.
+        This is the time when the instruction is actually executed in hardware.
+        """
+        if self._scheduled_time is None:
+            raise ValueError("Instruction has not been scheduled yet.")
+        return self._scheduled_time
+    
+
+    def set_scheduled_time(self, scheduled_time: int):
+        """
+        Set the scheduled time for the instruction.
+        This is the time when the instruction is actually executed in hardware.
+        
+        Args:
+            scheduled_time (int): The time when the instruction is scheduled to be executed.
+        """
+        self._scheduled_time = scheduled_time
+
+
+
     def get_time(self) -> int:
         """
         Get the time associated with the instruction.
+        This is only know and resolved after scheduling
         """
         return self._time
 
