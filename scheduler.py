@@ -18,6 +18,7 @@ class Scheduler:
         self._used_counter = { i: 0 for i in range(0, self._qubit_num + 1) }   # Count of how many process used each qubit. Syndrome qubit might be reused
         self._num_availble = self._qubit_num
         self._virtual_hardware_mapping = virtualHardwareMapping(hardware_instance)
+        self._dynamic_virtual_hardware_mapping = dynamicvirtualHardwareMapping(hardware_instance) #Keep track of the dynamic mapping of syndrome qubit
         self._current_process_in_execution = []
 
 
@@ -78,9 +79,10 @@ class Scheduler:
                 min_index = i
         return min_index if min_index is not None else -1
 
+
     def allocate_resources(self, process_instance: process):
         """
-        Allocate resources for a process.
+        Allocate resources for a process.(This is used for static mapping)
         Now assume that the number of data qubits required is less than or equal to the number of available physical qubits.
         Idea: Each data qubit must be mapped to different physical qubits.
               However, syndrome qubits can be reused.
@@ -148,6 +150,15 @@ class Scheduler:
             self.free_resources(process_instance)
 
         return total_qpu_time,final_inst_list
+
+
+    def dynamic_scheduling(self):
+        """
+        Schedule processes for execution where syndrome qubits are dynamically allocated.
+        (Each syndrome qubit in the virtual space is allocated on-the-fly)
+        """
+        pass
+
 
 
     def schedule(self):

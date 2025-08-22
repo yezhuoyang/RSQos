@@ -18,6 +18,46 @@ class virtualHardware:
         return self._physical_qubits
 
 
+class dynamicvirtualHardwareMapping:
+
+
+    def __init__(self, hardware_instance: virtualHardware):
+        """
+        Initialize the virtual hardware manager with a given hardware instance.
+        """
+        self._hardware = hardware_instance
+        self._mapping = {}
+
+
+    def __str__(self):
+        return f"dynamicvirtualHardwareMapping({self._mapping})"
+
+    def __repr__(self):
+        return f"dynamicvirtualHardwareMapping({self._mapping})"
+
+
+    def add_mapping(self, virtual_address: virtualAddress, physical_qubit: int, time: int):
+        """
+        Add a mapping from a virtual address to a physical qubit.
+        """
+        if physical_qubit >= self._hardware._physical_qubits:
+            raise ValueError("Invalid physical qubit number.")
+        if time not in self._mapping:
+            self._mapping[time] = {}
+        self._mapping[time][virtual_address] = physical_qubit
+
+    def get_physical_qubit(self, virtual_address: virtualAddress, time: int) -> int:
+        """
+        Get the physical qubit mapped to a virtual address.
+        """
+        if time not in self._mapping:
+            raise ValueError("Invalid time step.")
+
+        return self._mapping[time].get(virtual_address)
+
+
+
+
 class virtualHardwareMapping:
 
 
