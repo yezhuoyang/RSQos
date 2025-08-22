@@ -46,6 +46,115 @@ class process:
         self._consumed_qpu_time = 0
         self._virtual_data_addresses = []  # List to hold virtual data qubit addresses allocated to this process
         self._virtual_syndrome_addresses = []  # List to hold virtual syndrome qubit addresses allocated to this process        
+        """
+        The mapping from virtual address to physical address of all data qubits
+        This should be fixed throughout the life cycle of the process
+        """
+        self._data_qubit_virtual_hardware_mapping = {}  # type: dict[virtualAddress, int]
+        """
+        The mapping from virtual address to physical address of all syndrome qubits
+        This mapping can be changed during the life cycle of the process
+        """
+        self._syndrome_qubit_virtual_hardware_mapping = {}  # type: dict[virtualAddress, int]
+        self._syndrome_qubit_is_allocated = {}  # type: dict[virtualAddress, bool]
+
+    def set_status(self, status: ProcessStatus):
+        self._status = status
+
+
+    def get_status(self) -> ProcessStatus:
+        return self._status
+
+    def get_processID(self) -> int:
+        return self._processID
+
+
+    def empty_syndrome_qubit_mappings(self,addr):
+        """
+        Empty the mapping from virtual address to physical address for a given syndrome qubit.
+        This is used for dynamic allocation and deallocation of syndrome qubits.
+        
+         Args:
+            qubitaddress (virtualAddress): The virtual address of the qubit.
+        """
+        if not self.syndrome_qubit_is_allocated(addr):
+            raise ValueError("The requested syndrome qubit is not allocated.")
+        self._syndrome_qubit_virtual_hardware_mapping[addr] = -1
+        self._syndrome_qubit_is_allocated[addr] = False
+
+
+    def syndrome_qubit_is_allocated(self, qubitaddress: virtualAddress) -> bool:
+        """
+        Check if a given syndrome qubit (by its virtual address) is currently allocated.
+        
+        Returns:
+            bool: True if the syndrome qubit is allocated, False otherwise.
+        """
+        return self._syndrome_qubit_is_allocated.get(qubitaddress, False)
+
+
+    def get_syndrome_qubit_virtual_hardware_mapping(self,qubitaddress: virtualAddress) -> int:
+        """
+        Get the mapping from virtual address to physical address for syndrome qubits.
+        
+        Returns:
+            int: The physical address mapped to the given virtual address.
+        """
+        if not self.syndrome_qubit_is_allocated(qubitaddress):
+            raise ValueError("The requested syndrome qubit is not allocated.")
+        return self._syndrome_qubit_virtual_hardware_mapping[qubitaddress]
+
+
+    def set_syndrome_qubit_virtual_hardware_mapping(self, qubitaddress: virtualAddress, physicaladdress: int):
+        """
+        Set the mapping from virtual address to physical address for syndrome qubits.
+        
+         Args:
+            qubitaddress (virtualAddress): The virtual address of the qubit.
+            physicaladdress (int): The physical address to which the qubit is mapped.
+        """
+        self._syndrome_qubit_virtual_hardware_mapping[qubitaddress] = physicaladdress
+        self._syndrome_qubit_is_allocated[qubitaddress] = True
+
+
+    def set_data_qubit_virtual_hardware_mapping(self, qubitaddress: virtualAddress, physicaladdress: int):
+        """
+        Set the mapping from virtual address to physical address for data qubits.
+        
+         Args:
+            qubitaddress (virtualAddress): The virtual address of the qubit.
+            physicaladdress (int): The physical address to which the qubit is mapped.
+        """
+        self._data_qubit_virtual_hardware_mapping[qubitaddress] = physicaladdress
+
+
+    def get_data_qubit_virtual_hardware_mapping(self,qubitaddress: virtualAddress) -> int:
+        """
+        Get the mapping from virtual address to physical address for data qubits.
+        
+        Returns:
+            int: The physical address mapped to the given virtual address.
+        """
+        return self._data_qubit_virtual_hardware_mapping[qubitaddress] 
+
+
+    def is_data_qubit(self, qubitaddress: virtualAddress) -> bool:
+        """
+        Check if a given virtual address is a data qubit.
+        
+        Returns:
+            bool: True if the virtual address is a data qubit, False otherwise.
+        """
+        return qubitaddress in self._virtual_data_addresses
+
+    def is_syndrome_qubit(self, qubitaddress: virtualAddress) -> bool:
+        """
+        Check if a given virtual address is a syndrome qubit.
+        
+        Returns:
+            bool: True if the virtual address is a syndrome qubit, False otherwise.
+        """
+        return qubitaddress in self._virtual_syndrome_addresses
 
 
     def parse_from_stim_program(self, stim_program):
@@ -94,6 +203,8 @@ class process:
             if addr.is_syndrome():
                 if addr not in self._virtual_syndrome_addresses:
                     self._virtual_syndrome_addresses.append(addr)
+                if addr not in self._syndrome_qubit_is_allocated:
+                    self._syndrome_qubit_is_allocated[addr] = False
             else:
                 if addr not in self._virtual_data_addresses:
                     self._virtual_data_addresses.append(addr)
@@ -150,6 +261,29 @@ class process:
         Check if the process has completed all instructions.
         """
         return self._is_done
+
+
+
+    def get_next_instruction(self) -> instruction:
+        """
+        Get the next instruction to be executed in the process.
+        """
+        if self._next_instruction_label < len(self._instruction_list):
+            return self._instruction_list[self._next_instruction_label]
+        else:
+            return None
+
+
+    def get_addresses_of_next_instruction(self) -> List[virtualAddress]:
+        """
+        Get the qubit addresses of the next instruction to be executed.
+        """
+        if self._next_instruction_label < len(self._instruction_list):
+            inst = self._instruction_list[self._next_instruction_label]
+            return inst.get_qubitaddress()
+        else:
+            return []
+
 
     def execute_instruction(self, hardwaretime=0) -> instruction:
         """

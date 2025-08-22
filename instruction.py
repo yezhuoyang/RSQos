@@ -103,7 +103,52 @@ class instruction:
         self._scheduled_time=None  # This is the real time an instruction is performed in hardware after scheduling
         self._clock_time=get_clocktime(type)
         self._qubitaddress=qubitaddress
+        self._scheduled_mapped_address={} # This is the physical address after scheduling
         self._processID=processID
+
+
+    def is_reset(self) -> bool:
+        """
+        Check if the instruction is a reset operation.
+        
+        Returns:
+            bool: True if the instruction is a reset, False otherwise.
+        """
+        return self._type == Instype.RESET
+
+
+
+    def is_measurement(self) -> bool:
+        """
+        Check if the instruction is a measurement operation.
+        
+        Returns:
+            bool: True if the instruction is a measurement, False otherwise.
+        """
+        return self._type == Instype.MEASURE
+
+
+
+    def set_scheduled_mapped_address(self, qubitaddress: virtualAddress, physicaladdress: int):
+        """
+        Set the scheduled mapped address for a given qubit address.
+        
+        Args:
+            qubitaddress (virtualAddress): The virtual address of the qubit.
+            physicaladdress (int): The physical address to which the qubit is mapped.
+        """
+        self._scheduled_mapped_address[qubitaddress] = physicaladdress
+
+
+    def get_scheduled_mapped_address(self, qubitaddress: virtualAddress) -> int:
+        """
+        Get the scheduled mapped addresses for the instruction.
+        
+        Returns:
+            dict: A dictionary mapping virtual qubit addresses to physical addresses.
+        """
+        return self._scheduled_mapped_address[qubitaddress]
+
 
 
     def get_processID(self) -> int:

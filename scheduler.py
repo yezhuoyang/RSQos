@@ -80,6 +80,57 @@ class Scheduler:
         return min_index if min_index is not None else -1
 
 
+    def allocate_data_qubit(self, process_instance: process):
+        """
+        Allocate data qubits for a process.
+        This function is used for dynamic scheduling algorithm.
+        Each data qubit must be mapped to different physical qubits.
+        """
+        next_free_index_ = self.next_free_index(0)
+        for addr in process_instance.get_virtual_data_addresses():
+            """
+            Find the next available index
+            Case 1: The address is a data qubit, find the first availble qubit
+            """
+            self._current_avalible[next_free_index_] = False
+            self._used_counter[next_free_index_] = 1
+            self._num_availble -= 1
+            next_free_index_ = self.next_free_index(next_free_index_)
+            process_instance.set_data_qubit_virtual_hardware_mapping(addr, next_free_index_)
+
+
+
+    def free_syndrome_qubit(self, process_instance: process):
+        """
+        Free syndrome qubits allocated to a process.
+        This function is used for dynamic scheduling algorithm.
+        Syndrome qubits can be reused.
+        """
+        for addr in process_instance.get_virtual_syndrome_addresses():
+            if process_instance.syndrome_qubit_is_allocated(addr):
+                hardware_qid = process_instance.get_syndrome_qubit_virtual_hardware_mapping(addr)
+                self._used_counter[hardware_qid] -= 1
+                self._current_avalible[hardware_qid] = True
+                self._num_availble += 1
+                process_instance.empty_syndrome_qubit_mappings(addr)
+
+
+
+    def free_data_qubit(self, process_instance: process):
+        """
+        Free data qubits allocated to a process.
+        """
+        for addr in process_instance.get_virtual_data_addresses():
+            hardware_qid = process_instance.get_data_qubit_virtual_hardware_mapping(addr)
+            self._used_counter[hardware_qid] -= 1
+            self._current_avalible[hardware_qid] = True
+            self._num_availble += 1
+
+
+
+
+
+
     def allocate_resources(self, process_instance: process):
         """
         Allocate resources for a process.(This is used for static mapping)
@@ -157,9 +208,114 @@ class Scheduler:
         Schedule processes for execution where syndrome qubits are dynamically allocated.
         (Each syndrome qubit in the virtual space is allocated on-the-fly)
         """
-        pass
+        processes_stack = self._kernel.get_processes().copy()
+        processes_stack.sort(key=lambda x: x.get_start_time())  # Sort processes by start time
+        num_process = len(processes_stack)
+        num_finish_process = 0
+        total_qpu_time = 0
+        final_inst_list = []
+        while num_finish_process < num_process:
+            """
+            Three steps:
+            1. For process still wait to be started, check data qubit availability. Allocate data qubits if possible.
+            2. For process that wait for syndrome qubit, allocate syndrome qubit if possible.
+            3. For process in execution, execute the next instruction.
+            4. Update process status, free resources if process is done.
+            """
+            for process_instance in processes_stack:
+                if process_instance.get_status() == ProcessStatus.WAIT_TO_START:
+                    if self.have_enough_resources(process_instance):
+                        self.allocate_data_qubit(process_instance)
+                        process_instance.set_status(ProcessStatus.WAIT_FOR_ANSILLA)
 
 
+            """
+            Collect all the instructions that are waiting for syndrome qubit
+            """
+            for process_instance in processes_stack:
+                if process_instance.get_status() == ProcessStatus.WAIT_FOR_ANSILLA:
+                    num_ansilla_qubit_needed = 0
+                    next_inst = process_instance.get_next_instruction()
+                    if isinstance(next_inst, syscall):
+                        process_instance.set_status(ProcessStatus.RUNNING)
+                        continue
+
+                    addresses = next_inst.get_qubitaddress()
+                    for addr in addresses:
+                        if process_instance.is_syndrome_qubit(addr):
+                            if not process_instance.syndrome_qubit_is_allocated(addr):
+                                num_ansilla_qubit_needed += 1
+                            else:
+                                physical_qid = process_instance.get_syndrome_qubit_virtual_hardware_mapping(addr)
+                                next_inst.set_scheduled_mapped_address(addr, physical_qid)
+                        elif process_instance.is_data_qubit(addr):
+                            """
+                            Update the mapping of data qubit in the instruction
+                            """
+                            physical_qid = process_instance.get_data_qubit_virtual_hardware_mapping(addr)
+                            next_inst.set_scheduled_mapped_address(addr, physical_qid)
+                        
+                    if self._num_availble >= num_ansilla_qubit_needed:
+                        next_free_index_ = self.next_free_index(0)
+                        for addr in addresses:
+                            if process_instance.is_syndrome_qubit(addr) and not process_instance.syndrome_qubit_is_allocated(addr):
+                                self._current_avalible[next_free_index_] = False
+                                self._used_counter[next_free_index_] = 1
+                                self._num_availble -= 1
+                                next_inst.set_scheduled_mapped_address(addr, next_free_index_)
+                                process_instance.set_syndrome_qubit_virtual_hardware_mapping(addr, next_free_index_)
+                                next_free_index_ = self.next_free_index(next_free_index_)
+                        process_instance.set_status(ProcessStatus.RUNNING)
+
+
+            """
+            Execute the next instruction for all processes in RUNNING status.
+            These processes run in parallel.
+            Update the total_qpu_time by the maximum time cost among all processes.
+            Free ansilla qubit after running the instruction.
+            """
+            move_time = 0
+            for process_instance in processes_stack:
+                if process_instance.get_status() == ProcessStatus.RUNNING:
+                    next_inst = process_instance.get_next_instruction()
+                    process_instance.execute_instruction(total_qpu_time)
+                    if not next_inst == None:
+                        if isinstance(next_inst, instruction):
+                            tmp_time = get_clocktime(next_inst.get_type())
+                        else:
+                            tmp_time = get_syscall_time(next_inst)
+                        move_time = max(move_time, tmp_time)
+                        final_inst_list.append(next_inst)
+
+                        if isinstance(next_inst, instruction):
+                            if next_inst.is_measurement():
+                                addresses = next_inst.get_qubitaddress()
+                                """
+                                If the instruction is a measurement instruction
+                                Free the ansilla qubit used in this instruction
+                                The state of this process will be changed to WAIT_FOR_ANSILLA
+                                """
+                                for addr in addresses:
+                                    if process_instance.is_syndrome_qubit(addr):
+                                        physical_qid = next_inst.get_scheduled_mapped_address(addr)
+                                        self._used_counter[physical_qid] -= 1
+                                        self._current_avalible[physical_qid] = True
+                                        self._num_availble += 1
+                                        process_instance.empty_syndrome_qubit_mappings(addr)
+                    if not process_instance.get_status() == ProcessStatus.FINISHED:
+                        process_instance.set_status(ProcessStatus.WAIT_FOR_ANSILLA)
+            total_qpu_time += move_time
+
+            """
+            Free all data qubit resources for finished processes.
+            """
+            for process_instance in processes_stack:
+                if process_instance.get_status() == ProcessStatus.FINISHED:
+                    self.free_data_qubit(process_instance)
+                    self.free_syndrome_qubit(process_instance)
+                    num_finish_process += 1
+            
+        return total_qpu_time, final_inst_list
 
     def schedule(self):
         """
@@ -222,6 +378,39 @@ class Scheduler:
 
         return total_qpu_time,final_inst_list
 
+
+
+    def print_dynamic_instruction_list(self, inst_list):
+        """
+        Print the result of instruction list of dynamic scheduling in an organized and clean format.
+        For example:
+            P1(t=5):  CNOT qubit 0 (->vspace[3]),  1 (->vspace[4])
+            P1(t=6):  Syscall MAGIC_STATE_DISTILLATION qubit 0 (->vTspace[0]), 1 (->vTspace[1]), ...
+        """
+        for inst in inst_list:
+            if isinstance(inst, instruction):
+                process_id = inst.get_processID()
+                inst_name = get_gate_type_name(inst.get_type())
+                inst_time = inst.get_scheduled_time()
+                addresses = inst.get_qubitaddress()
+
+                mapped_addresses = [
+                    f"{inst.get_scheduled_mapped_address(addr)} (->{addr})"
+                    for addr in addresses
+                ]
+                addr_str = ", ".join(mapped_addresses)
+                print(f"P{process_id}(t={inst_time}): {inst_name} qubit {addr_str}")
+
+            elif isinstance(inst, syscall):
+                process_id = inst.get_processID()
+                inst_name = get_syscall_type_name(inst)
+                inst_time = inst.get_scheduled_time()
+                addresses = inst.get_address()
+
+                print(f"P{process_id}(t={inst_time}): Syscall {inst_name}")
+
+            else:
+                print("Unknown instruction type.")
 
 
 
@@ -570,32 +759,30 @@ if __name__ == "__main__":
 
     kernel_instance, virtual_hardware = generate_example()
     schedule_instance=Scheduler(kernel_instance,virtual_hardware)
-    time1, inst_list1=schedule_instance.baseline_scheduling()
+    time1, inst_list1=schedule_instance.dynamic_scheduling()
+    schedule_instance.print_dynamic_instruction_list(inst_list1)
 
 
 
 
-    mapping = schedule_instance.get_virtual_hardware_mapping()
+#    #print("Mapping after scheduling:")
+
+#     #print(mapping)
 
 
-   #print("Mapping after scheduling:")
-
-    #print(mapping)
-
-
-    kernel_instance, virtual_hardware = generate_example()
-    schedule_instance=Scheduler(kernel_instance,virtual_hardware)
-    time2, inst_list2=schedule_instance.schedule()
+#     kernel_instance, virtual_hardware = generate_example()
+#     schedule_instance=Scheduler(kernel_instance,virtual_hardware)
+#     time2, inst_list2=schedule_instance.schedule()
 
 
-    print("Baseline: {}".format(time1))
+#     print("Baseline: {}".format(time1))
 
 
-    print("Our: {}".format(time2))
-    #print(kernel_instance)
+#     print("Our: {}".format(time2))
+#     #print(kernel_instance)
 
 
-    schedule_instance.print_instruction_list(inst_list2)
+#     schedule_instance.print__instruction_list(inst_list2)
 
 
 
