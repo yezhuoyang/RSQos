@@ -77,6 +77,29 @@ class syscall:
         self._time = time  # This is the time when the syscall is executed in the virtual machine
         self._scheduled_time = None  # This is the real time a syscall is performed in
         self._address = None  # This will be set in specific syscall subclasses
+        self._scheduled_mapped_address={} # This is the physical address after scheduling
+
+
+    def set_scheduled_mapped_address(self, qubitaddress: virtualAddress, physicaladdress: int):
+        """
+        Set the scheduled mapped address for a given qubit address.
+        
+        Args:
+            qubitaddress (virtualAddress): The virtual address of the qubit.
+            physicaladdress (int): The physical address to which the qubit is mapped.
+        """
+        self._scheduled_mapped_address[qubitaddress] = physicaladdress
+
+
+    def get_scheduled_mapped_address(self, qubitaddress: virtualAddress) -> int:
+        """
+        Get the scheduled mapped addresses for the instruction.
+        
+        Returns:
+            dict: A dictionary mapping virtual qubit addresses to physical addresses.
+        """
+        return self._scheduled_mapped_address[qubitaddress]
+
 
     def set_address(self, address: List[virtualAddress]):
         """

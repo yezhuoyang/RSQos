@@ -212,6 +212,7 @@ class Scheduler:
         processes_stack.sort(key=lambda x: x.get_start_time())  # Sort processes by start time
         num_process = len(processes_stack)
         num_finish_process = 0
+        process_finish_map = {i: False for i in processes_stack}
         total_qpu_time = 0
         final_inst_list = []
         while num_finish_process < num_process:
@@ -237,9 +238,15 @@ class Scheduler:
                     num_ansilla_qubit_needed = 0
                     next_inst = process_instance.get_next_instruction()
                     if isinstance(next_inst, syscall):
-                        process_instance.set_status(ProcessStatus.RUNNING)
+                        """
+                        When the next instruction is a syscall for T factory or magic state distillation,
+                        we change the status of the process to WAIT_FOR_T_GATE
+                        """
+                        if isinstance(next_inst, syscall_magic_state_distillation):
+                            process_instance.set_status(ProcessStatus.WAIT_FOR_T_GATE)
+                        else:
+                            process_instance.set_status(ProcessStatus.RUNNING)
                         continue
-
                     addresses = next_inst.get_qubitaddress()
                     for addr in addresses:
                         if process_instance.is_syndrome_qubit(addr):
@@ -269,6 +276,27 @@ class Scheduler:
 
 
             """
+            If there is any process waiting for T gate,
+            we use greedy algorithm to allocate T gate resources.
+            """
+            for process_instance in processes_stack:
+                if process_instance.get_status() == ProcessStatus.WAIT_FOR_T_GATE:
+                    t_next_inst = process_instance.get_next_instruction()
+                    addresses = t_next_inst.get_address()    
+                    if self._num_availble >= len(addresses):
+                        next_free_index_ = self.next_free_index(0)
+                        for addr in addresses:
+                            self._current_avalible[next_free_index_] = False
+                            self._used_counter[next_free_index_] = 1
+                            self._num_availble -= 1
+                            t_next_inst.set_scheduled_mapped_address(addr, next_free_index_)
+                            process_instance.set_syndrome_qubit_virtual_hardware_mapping(addr, next_free_index_)
+                            next_free_index_ = self.next_free_index(next_free_index_)
+                        process_instance.set_status(ProcessStatus.RUNNING)       
+
+
+
+            """
             Execute the next instruction for all processes in RUNNING status.
             These processes run in parallel.
             Update the total_qpu_time by the maximum time cost among all processes.
@@ -286,6 +314,20 @@ class Scheduler:
                             tmp_time = get_syscall_time(next_inst)
                         move_time = max(move_time, tmp_time)
                         final_inst_list.append(next_inst)
+
+                        if isinstance(next_inst, syscall_magic_state_distillation):
+                            """
+                            If the instruction is a syscall for magic state distillation,
+                            We also have to freed the ansilla qubits used in this syscall
+                            """
+                            addresses = next_inst.get_address()
+                            for addr in addresses:
+                                physical_qid = next_inst.get_scheduled_mapped_address(addr)
+                                self._used_counter[physical_qid] -= 1
+                                self._current_avalible[physical_qid] = True
+                                self._num_availble += 1
+                                process_instance.empty_syndrome_qubit_mappings(addr)
+
 
                         if isinstance(next_inst, instruction):
                             if next_inst.is_measurement():
@@ -310,11 +352,11 @@ class Scheduler:
             Free all data qubit resources for finished processes.
             """
             for process_instance in processes_stack:
-                if process_instance.get_status() == ProcessStatus.FINISHED:
+                if process_instance.get_status() == ProcessStatus.FINISHED and (not process_finish_map[process_instance]):
                     self.free_data_qubit(process_instance)
                     self.free_syndrome_qubit(process_instance)
                     num_finish_process += 1
-            
+                    process_finish_map[process_instance] = True
         return total_qpu_time, final_inst_list
 
     def schedule(self):
@@ -406,8 +448,15 @@ class Scheduler:
                 inst_name = get_syscall_type_name(inst)
                 inst_time = inst.get_scheduled_time()
                 addresses = inst.get_address()
-
-                print(f"P{process_id}(t={inst_time}): Syscall {inst_name}")
+                if isinstance(inst, syscall_magic_state_distillation):
+                    mapped_addresses = [
+                        f"{inst.get_scheduled_mapped_address(addr)} (->{addr})"
+                        for addr in addresses
+                    ]
+                    addr_str = ", ".join(mapped_addresses)
+                    print(f"P{process_id}(t={inst_time}): Syscall {inst_name} qubit {addr_str}")
+                else:
+                    print(f"P{process_id}(t={inst_time}): Syscall {inst_name}")
 
             else:
                 print("Unknown instruction type.")
@@ -452,6 +501,52 @@ class Scheduler:
                 print("Unknown instruction type.")
 
 
+def simple_example_with_T_gate():
+    vdata1 = virtualSpace(size=10, label="vdata1")
+    vdata1.allocate_range(0,2)
+    vsyn1 = virtualSpace(size=5, label="vsyn1", is_syndrome=True)
+    vsyn1.allocate_range(0,4)
+    proc1 = process(processID=1,start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])  # CNOT operation
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])  # CNOT operation
+
+    proc1.add_syscall(syscallinst=syscall_magic_state_distillation(address=[vsyn1.get_address(2),vsyn1.get_address(3)],processID=1))  # Magic state distillation
+
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(2)])  # CNOT operation
+    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
+
+
+    vdata2 = virtualSpace(size=10, label="vdata2")
+    vdata2.allocate_range(0,2)
+    vsyn2 = virtualSpace(size=5, label="vsyn2", is_syndrome=True)
+    vsyn2.allocate_range(0,4)
+    proc2 = process(processID=2,start_time=3, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1),vsyn2.get_address(2)],size=3,processID=2))  # Allocate 2 syndrome qubits
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(0)])  # CNOT operation
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(1)])  # CNOT operation
+
+    proc2.add_syscall(syscallinst=syscall_magic_state_distillation(address=[vsyn2.get_address(2),vsyn2.get_address(3)],processID=2))  # Magic state distillation
+
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(2)])  # CNOT operation
+    proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3 ,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1),vsyn2.get_address(2)],size=3,processID=2))  # Allocate 2 syndrome qubits
+
+    #print(proc2)
+    kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    virtual_hardware = virtualHardware(qubit_number=11, error_rate=0.001)
+
+    return kernel_instance, virtual_hardware
+
+
+
 def generate_example():
     vdata1 = virtualSpace(size=10, label="vdata1")
     vdata1.allocate_range(0,2)
@@ -486,7 +581,7 @@ def generate_example():
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
-    virtual_hardware = virtualHardware(qubit_number=8, error_rate=0.001)
+    virtual_hardware = virtualHardware(qubit_number=7, error_rate=0.001)
 
     return kernel_instance, virtual_hardware
 
@@ -757,10 +852,18 @@ def generate_example6():
 
 if __name__ == "__main__":
 
-    kernel_instance, virtual_hardware = generate_example()
+    kernel_instance, virtual_hardware = simple_example_with_T_gate()
     schedule_instance=Scheduler(kernel_instance,virtual_hardware)
     time1, inst_list1=schedule_instance.dynamic_scheduling()
     schedule_instance.print_dynamic_instruction_list(inst_list1)
+
+
+    print("-------------------------------------------------------------")
+
+    # kernel_instance, virtual_hardware = generate_example()
+    # schedule_instance=Scheduler(kernel_instance,virtual_hardware)
+    # time2, inst_list2=schedule_instance.schedule()
+    # schedule_instance.print_instruction_list(inst_list2)
 
 
 
