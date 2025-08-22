@@ -187,10 +187,13 @@ class Scheduler:
             """
             cost_time = 0
             for process_instance in active_processes:
-                inst = process_instance.execute_instruction()
-                if isinstance(inst, instruction):
+                inst = process_instance.execute_instruction(total_qpu_time)
+                if not inst==None:
+                    if isinstance(inst, instruction):
+                        tmp_time= get_clocktime(inst.get_type())
+                    else:
+                        tmp_time= get_syscall_time(inst)
                     final_inst_list.append(inst)
-                    tmp_time= get_clocktime(inst.get_type())
                     cost_time = max(cost_time, tmp_time)
             total_qpu_time += cost_time
 
@@ -283,7 +286,7 @@ def generate_example():
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001)
+    virtual_hardware = virtualHardware(qubit_number=8, error_rate=0.001)
 
     return kernel_instance, virtual_hardware
 
