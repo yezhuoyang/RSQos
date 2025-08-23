@@ -26,6 +26,9 @@ class virtualSpace:
         self._is_syndrome = is_syndrome
         self._is_T_factory = is_T_factory
 
+    def get_label(self) -> str:
+        return self._label
+
     def is_syndrome(self) -> bool:
         return self._is_syndrome
     

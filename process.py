@@ -3,6 +3,10 @@
 from instruction import *
 from virtualSpace import virtualSpace, virtualAddress
 from syscall import *
+import qiskit
+from qiskit.circuit import Gate
+from qiskit.visualization import circuit_drawer
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 
 class ProcessStatus(Enum):
@@ -23,6 +27,7 @@ class process:
         self._instruction_list = []
         self._syscall_list = []
         self._current_time = start_time
+        self._num_measurement = 0
         self._status = ProcessStatus.WAIT_TO_START
         """
         The virtual data space, and virtual syndrome qubit space allocated to this process by the OS
@@ -90,7 +95,7 @@ class process:
         Returns:
             bool: True if the syndrome qubit is allocated, False otherwise.
         """
-        return self._syndrome_qubit_is_allocated.get(qubitaddress, False)
+        return self._syndrome_qubit_is_allocated.get(qubitaddress)
 
 
     def get_syndrome_qubit_virtual_hardware_mapping(self,qubitaddress: virtualAddress) -> int:
@@ -199,6 +204,8 @@ class process:
         inst=instruction(type, qubitaddress, self._processID,time)
         self._instruction_list.append(inst)
         self._executed[inst] = False
+        if type == Instype.MEASURE:
+            self._num_measurement += 1
         for addr in qubitaddress:
             if addr.is_syndrome():
                 if addr not in self._virtual_syndrome_addresses:
@@ -241,6 +248,10 @@ class process:
                 self._vdataspace.free_range(0, syscallinst._size - 1)
             elif isinstance(syscallinst, syscall_deallocate_syndrome_qubits):
                 self._vsyndromespace.free_range(0, syscallinst._size - 1)
+            elif isinstance(syscallinst, syscall_magic_state_distillation):
+                for addr in syscallinst.get_address():
+                    if self._num_syndrome_qubits<addr.get_index()+1:
+                        self._num_syndrome_qubits=addr.get_index()+1
         else:
             raise TypeError("Expected a syscall instance.")
 
@@ -312,32 +323,92 @@ class process:
         return self._consumed_qpu_time
 
 
+    def construct_qiskit_diagram(self):
+        """
+        Construct a qiskit circuit from the instruction list.
+        Also help to visualize the circuit.
+        """
+        dataqubit = QuantumRegister(self._num_data_qubits, self._vdataspace.get_label())
 
+        # Second part: 2 qubits named 's'
+        syndromequbit = QuantumRegister(self._num_syndrome_qubits,self._vsyndromespace.get_label())
+
+        # Classical registers (optional, if you want measurements)
+        classicalbits = ClassicalRegister(self._num_measurement, "c")
+
+        # Combine them into one circuit
+        qiskit_circuit = QuantumCircuit(dataqubit,  syndromequbit, classicalbits)
+
+
+        current_measurement = 0
+        for inst in self._instruction_list:
+            if isinstance(inst, instruction):
+                inst_name = get_gate_type_name(inst.get_type())
+                addresses = inst.get_qubitaddress()
+                qiskitaddress=[]
+                for addr in addresses:
+                    if addr.is_syndrome():
+                        qiskitaddress.append(syndromequbit[addr.get_index()])
+                    else:
+                        qiskitaddress.append(dataqubit[addr.get_index()])
+                match inst.get_type():
+                    case Instype.CNOT:
+                        qiskit_circuit.cx(qiskitaddress[0], qiskitaddress[1])
+                    case Instype.X:
+                        qiskit_circuit.x(qiskitaddress[0])                
+                    case Instype.Y:
+                        qiskit_circuit.y(qiskitaddress[0]) 
+                    case Instype.Z:
+                        qiskit_circuit.z(qiskitaddress[0])   
+                    case Instype.H: 
+                        qiskit_circuit.h(qiskitaddress[0])
+                    case Instype.RESET:
+                        qiskit_circuit.reset(qiskitaddress[0]) 
+                    case Instype.MEASURE:
+                        qiskit_circuit.measure(qiskitaddress[0], current_measurement)
+                        current_measurement += 1
+                
+
+            elif isinstance(inst, syscall):
+                if isinstance(inst, syscall_magic_state_distillation):
+                    addresses = inst.get_address()
+                    qiskitaddress=[]
+                    for addr in addresses:
+                        print(addr)
+                        
+                        qiskitaddress.append(syndromequbit[addr.get_index()])
+                    qubit_num = len(addresses)
+                    my_gate = Gate(name=f"MAGIC", num_qubits=qubit_num, params=[])
+                    qiskit_circuit.append(my_gate, qiskitaddress)
+                else:
+                    qubit_num = self._num_data_qubits + self._num_syndrome_qubits
+                    my_gate = Gate(name=f"{inst.get_simple_name()}, P{self._processID}", num_qubits=qubit_num, params=[])
+                    qiskit_circuit.append(my_gate, list(range(qubit_num)))
+        style = {
+            "fontsize": 15  # increase/decrease as needed
+        }
+
+        fig = circuit_drawer(qiskit_circuit, output="mpl", fold=-1, style=style) 
+        fig.savefig(f"circuit_P{self._processID}.png", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":
 
-    vdata = virtualSpace(size=10, label="vdata")
-    vsyn = virtualSpace(size=5, label="vsyn", is_syndrome=True)
-    process_instance = process(processID=1,start_time=0, vdataspace=vdata, vsyndromespace=vsyn)
+    vdata1 = virtualSpace(size=10, label="vdata1")
+    vdata1.allocate_range(0,2)
+    vsyn1 = virtualSpace(size=5, label="vsyn1", is_syndrome=True)
+    vsyn1.allocate_range(0,4)
+    proc1 = process(processID=1,start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])  # CNOT operation
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])  # CNOT operation
 
-    process_instance.add_syscall(syscallinst=syscall_allocate_data_qubits(size=3,processID=1))  # Allocate 2 data qubits
-    process_instance.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(size=3,processID=1))  # Allocate 2 syndrome qubits
+    proc1.add_syscall(syscallinst=syscall_magic_state_distillation(address=[vsyn1.get_address(2),vsyn1.get_address(3)],processID=1))  # Magic state distillation
 
-    print(f"Process data qubit num is {process_instance._num_data_qubits}" )
-    print(f"Process syndrome qubit num is {process_instance._num_syndrome_qubits}" )
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(2)])  # CNOT operation
+    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
 
-
-    print(vdata.get_address(1))
-
-    process_instance.add_instruction(Instype.CNOT, [vdata.get_address(0), vsyn.get_address(0)])  # CNOT operation
-
-    process_instance.add_instruction(Instype.CNOT, [vdata.get_address(1), vsyn.get_address(1)])  # CNOT operation
-
-
-
-    process_instance.add_instruction(Instype.MEASURE, [vsyn.get_address(0)])  # Measure operation
-    process_instance.add_instruction(Instype.CNOT, [vdata.get_address(1), vsyn.get_address(2)])  # CNOT operation
-
-
-    print(process_instance)
+    proc1.construct_qiskit_diagram()

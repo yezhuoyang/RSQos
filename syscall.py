@@ -73,11 +73,22 @@ class syscall:
         self._syscall_type = syscall_type
         self._processID = processID
         self._name=None
+        self._simple_name=None
         self._size=None
         self._time = time  # This is the time when the syscall is executed in the virtual machine
         self._scheduled_time = None  # This is the real time a syscall is performed in
         self._address = None  # This will be set in specific syscall subclasses
         self._scheduled_mapped_address={} # This is the physical address after scheduling
+
+
+    def get_simple_name(self) -> str:
+        """
+        Get the simple name of the syscall.
+        
+        Returns:
+            str: The simple name of the syscall.
+        """
+        return self._simple_name    
 
 
     def set_scheduled_mapped_address(self, qubitaddress: virtualAddress, physicaladdress: int):
@@ -178,6 +189,7 @@ class syscall_magic_state_distillation(syscall):
         """
         super().__init__(syscall_type=syscalltype.MAGIC_STATE_DISTILLATION, processID=processID)
         self._name="MAGIC_STATE_DISTILLATION"
+        self._simple_name="MSD"
         self.set_address(address)
 
     def __str__(self):
@@ -193,7 +205,7 @@ class syscall_allocate_data_qubits(syscall):
         self._size = size
         self._name="ALLOCATE_DATA_QUBITS"
         self.set_address(address)
-
+        self._simple_name="ALD"    
     def __str__(self):
         return f"ADQ: {self._syscall_type.name}, Size: {self._size}"
 
@@ -208,7 +220,7 @@ class syscall_deallocate_data_qubits(syscall):
         self.set_address(address)
         self._size = size
         self._name="DEALLOCATE_DATA_QUBITS"
-
+        self._simple_name="FRD"    
     def __str__(self):
         return f"DDQ: {self._syscall_type.name}, Size: {self._size}"
 
@@ -222,7 +234,7 @@ class syscall_allocate_syndrome_qubits(syscall):
         self.set_address(address)
         self._size = size
         self._name="ALLOCATE_SYNDROME_QUBITS"
-
+        self._simple_name="ALS"   
     def __str__(self):
         return f"ASQ: {self._syscall_type.name}, Size: {self._size}"
 
@@ -236,7 +248,7 @@ class syscall_deallocate_syndrome_qubits(syscall):
         self.set_address(address)
         self._size = size
         self._name="DEALLOCATE_SYNDROME_QUBITS"
-
+        self._simple_name="FRS"  
     def __str__(self):
         return f"DSQ: {self._syscall_type.name}, Size: {self._size}"
 

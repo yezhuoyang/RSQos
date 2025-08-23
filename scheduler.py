@@ -4,9 +4,10 @@ from instruction import *
 from hardware import *
 from instruction import *
 from syscall import *
-
-
-
+import qiskit
+from qiskit.circuit import Gate
+from qiskit.visualization import circuit_drawer
+from qiskit.circuit.library import HGate
 class Scheduler:
     def __init__(self, kernel_instance: Kernel, hardware_instance: virtualHardware):
         self._kernel = kernel_instance
@@ -20,7 +21,7 @@ class Scheduler:
         self._virtual_hardware_mapping = virtualHardwareMapping(hardware_instance)
         self._dynamic_virtual_hardware_mapping = dynamicvirtualHardwareMapping(hardware_instance) #Keep track of the dynamic mapping of syndrome qubit
         self._current_process_in_execution = []
-
+        self._num_measurement = 0  # Keep track of the number of measurement instructions executed
 
     def get_virtual_hardware_mapping(self) -> virtualHardwareMapping:
         """
@@ -95,9 +96,8 @@ class Scheduler:
             self._current_avalible[next_free_index_] = False
             self._used_counter[next_free_index_] = 1
             self._num_availble -= 1
-            next_free_index_ = self.next_free_index(next_free_index_)
             process_instance.set_data_qubit_virtual_hardware_mapping(addr, next_free_index_)
-
+            next_free_index_ = self.next_free_index(next_free_index_ + 1)
 
 
     def free_syndrome_qubit(self, process_instance: process):
@@ -193,14 +193,26 @@ class Scheduler:
 
             while not process_instance.is_done():
                 inst=process_instance.execute_instruction(total_qpu_time)
+
+                if isinstance(inst, instruction):
+                    if inst.is_measurement():
+                        self._num_measurement += 1
+
                 if isinstance(inst, instruction):
                     total_qpu_time += get_clocktime(inst.get_type())
                 else:
                     total_qpu_time += get_syscall_time(inst)
+                addresses = inst.get_qubitaddress() if isinstance(inst, instruction) else inst.get_address()
+                for addr in addresses:
+                    physical_qid = self._virtual_hardware_mapping.get_physical_qubit(addr)
+                    inst.set_scheduled_mapped_address(addr, physical_qid)
                 final_inst_list.append(inst)
             self.free_resources(process_instance)
 
         return total_qpu_time,final_inst_list
+
+
+
 
 
     def dynamic_scheduling(self):
@@ -248,6 +260,7 @@ class Scheduler:
                             process_instance.set_status(ProcessStatus.RUNNING)
                         continue
                     addresses = next_inst.get_qubitaddress()
+                    
                     for addr in addresses:
                         if process_instance.is_syndrome_qubit(addr):
                             if not process_instance.syndrome_qubit_is_allocated(addr):
@@ -332,6 +345,7 @@ class Scheduler:
                         if isinstance(next_inst, instruction):
                             if next_inst.is_measurement():
                                 addresses = next_inst.get_qubitaddress()
+                                self._num_measurement += 1
                                 """
                                 If the instruction is a measurement instruction
                                 Free the ansilla qubit used in this instruction
@@ -501,6 +515,80 @@ class Scheduler:
                 print("Unknown instruction type.")
 
 
+
+    def construct_qiskit_from_instruction_list(self,inst_list):
+        """
+        Construct a qiskit circuit from the instruction list.
+        Also help to visualize the circuit.
+        """
+        qiskit_circuit = qiskit.QuantumCircuit(self._hardware.get_qubit_num(), self._num_measurement)
+        current_measurement = 0
+        current_time = 0 
+        for inst in inst_list:
+            if isinstance(inst, instruction):
+                process_id = inst.get_processID()
+                inst_name = get_gate_type_name(inst.get_type())
+                inst_time = inst.get_scheduled_time()
+                addresses = inst.get_qubitaddress()
+                mapped_addresses = [
+                    f"{inst.get_scheduled_mapped_address(addr)} ({addr})"
+                    for addr in addresses
+                ]
+                addr_str = ", ".join(mapped_addresses)
+                addr_str= f"P{process_id}:" + addr_str
+                match inst.get_type():
+                    case Instype.CNOT:
+                        qiskit_circuit.cx(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), label=addr_str)
+                    case Instype.X:
+                        qiskit_circuit.x(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")                 
+                    case Instype.Y:
+                        qiskit_circuit.y(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}") 
+                    case Instype.Z:
+                        qiskit_circuit.z(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")   
+                    case Instype.H: 
+                        qiskit_circuit.append(HGate(label=f"H(P{process_id})"),[inst.get_scheduled_mapped_address(addresses[0])])
+                        #qiskit_circuit.h(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")
+                    case Instype.RESET:
+                        qiskit_circuit.reset(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}") 
+                    case Instype.MEASURE:
+                        qiskit_circuit.measure(inst.get_scheduled_mapped_address(addresses[0]), current_measurement)
+                        qiskit_circuit.barrier(label=f"P{process_id} measure, t={inst_time}")
+                        current_measurement += 1
+                
+
+            elif isinstance(inst, syscall):
+                process_id = inst.get_processID()
+                inst_name = get_syscall_type_name(inst)
+                inst_time = inst.get_scheduled_time()
+                addresses = inst.get_address()
+                if isinstance(inst, syscall_magic_state_distillation):
+                    mapped_addresses = [
+                        f"{inst.get_scheduled_mapped_address(addr)} (->{addr})"
+                        for addr in addresses
+                    ]
+                    qubit_num = len(mapped_addresses)
+                    my_gate = Gate(name=f"MAGIC, P{process_id}", num_qubits=qubit_num, params=[])
+                    qiskit_circuit.append(my_gate, [inst.get_scheduled_mapped_address(addr) for addr in addresses])
+                else:
+                    my_gate = Gate(name=f"{inst.get_simple_name()}, P{process_id}", num_qubits=self._qubit_num, params=[])
+                    qiskit_circuit.append(my_gate, list(range(self._qubit_num)))
+
+            if inst_time > current_time:
+                qiskit_circuit.barrier(label=f"t={inst_time}")     
+            current_time = inst_time
+
+        style = {
+            "fontsize": 15  # increase/decrease as needed
+        }
+
+        fig = circuit_drawer(qiskit_circuit, output="mpl", fold=-1, style=style) 
+        fig.savefig("my_circuit.png", dpi=300, bbox_inches="tight")
+
+
+
+
+
+
 def simple_example_with_T_gate():
     vdata1 = virtualSpace(size=10, label="vdata1")
     vdata1.allocate_range(0,2)
@@ -519,6 +607,7 @@ def simple_example_with_T_gate():
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
 
+    proc1.construct_qiskit_diagram()
 
     vdata2 = virtualSpace(size=10, label="vdata2")
     vdata2.allocate_range(0,2)
@@ -537,14 +626,68 @@ def simple_example_with_T_gate():
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3 ,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1),vsyn2.get_address(2)],size=3,processID=2))  # Allocate 2 syndrome qubits
 
+    proc2.construct_qiskit_diagram()
+
     #print(proc2)
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
-    virtual_hardware = virtualHardware(qubit_number=11, error_rate=0.001)
+    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001)
 
     return kernel_instance, virtual_hardware
 
+
+
+
+
+def generate_example_ppt():
+    vdata1 = virtualSpace(size=3, label="vdata1")
+    vdata1.allocate_range(0,2)
+    vsyn1 = virtualSpace(size=2, label="vsyn1", is_syndrome=True)
+    vsyn1.allocate_range(0,1)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1)],size=2,processID=1))  # Allocate 2 syndrome qubits
+    proc1.add_instruction(Instype.H, [vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.CNOT, [vsyn1.get_address(0),vsyn1.get_address(1)])
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])  # CNOT operation
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])  # CNOT operation
+    proc1.add_instruction(Instype.CNOT, [vsyn1.get_address(0), vsyn1.get_address(1)])  # CNOT operation    
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])  # Measure operation
+    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1)],size=2,processID=1))  # Allocate 2 syndrome qubits
+    proc1.construct_qiskit_diagram()
+
+
+    vdata2 = virtualSpace(size=3, label="vdata2")
+    vdata2.allocate_range(0,2)
+    vsyn2 = virtualSpace(size=2, label="vsyn2", is_syndrome=True)
+    vsyn2.allocate_range(0,1)
+    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1)],size=2,processID=2))  # Allocate 2 syndrome qubits
+    proc2.add_instruction(Instype.H, [vsyn2.get_address(0)])
+    proc2.add_instruction(Instype.CNOT, [vsyn2.get_address(0),vsyn2.get_address(1)])
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(0)])  # CNOT operation
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(1)])  # CNOT operation
+    proc2.add_instruction(Instype.CNOT, [vsyn2.get_address(0), vsyn2.get_address(1)])  # CNOT operation    
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)])  # Measure operation
+    proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3 ,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1)],size=2,processID=2))  # Allocate 2 syndrome qubits
+
+
+    proc2.construct_qiskit_diagram()
+
+
+    #print(proc2)
+    kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    virtual_hardware = virtualHardware(qubit_number=7, error_rate=0.001)
+
+    return kernel_instance, virtual_hardware
 
 
 def generate_example():
@@ -852,11 +995,14 @@ def generate_example6():
 
 if __name__ == "__main__":
 
-    kernel_instance, virtual_hardware = simple_example_with_T_gate()
+    kernel_instance, virtual_hardware = generate_example_ppt()
     schedule_instance=Scheduler(kernel_instance,virtual_hardware)
     time1, inst_list1=schedule_instance.dynamic_scheduling()
+    #time1, inst_list1=schedule_instance.baseline_scheduling()
     schedule_instance.print_dynamic_instruction_list(inst_list1)
 
+
+    schedule_instance.construct_qiskit_from_instruction_list(inst_list1)
 
     print("-------------------------------------------------------------")
 
