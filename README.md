@@ -116,8 +116,8 @@ On the highlest level, our kenel deal with logical process that users want to ex
 The kernel manage all these process, optimize the resource usage.
 
 
-- [*] Logical quantum process
-- [*] Kernel for logical quantum computer
+- [x] Logical quantum process
+- [x] Kernel for logical quantum computer
 
 
 
@@ -126,8 +126,8 @@ The kernel manage all these process, optimize the resource usage.
 
 
 
-- [*] Add a function to print the scheduling log.
-- [*] Change Process Status while scheduling.
-- [*] For T-factory syscall, add space requirement.
-- [*] Consider T-factory scheduling in the baseline algorithm.
-- [*] Consider T-factory scheduling in the round robin algorithm. 
+- [x] Add a function to print the scheduling log.
+- [x] Change Process Status while scheduling.
+- [x] For T-factory syscall, add space requirement.
+- [x] Consider T-factory scheduling in the baseline algorithm.
+- [x] Consider T-factory scheduling in the round robin algorithm. 
