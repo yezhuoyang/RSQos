@@ -7,15 +7,26 @@ from virtualSpace import *
 class virtualHardware:
 
 
-    def __init__(self, qubit_number:int, error_rate:float):
+    def __init__(self, qubit_number:int, error_rate:float, edge_list:List[List[int]] = []):
         """
         Initialize the virtual hardware with configuration parameters.
         """
         self._physical_qubits = qubit_number
         self._error_rate = error_rate
 
+        self._edge_list = edge_list  # List of tuples representing connections between qubits
+
+
     def get_qubit_num(self) -> int:
         return self._physical_qubits
+
+
+    def has_edge(self, qubit1: int, qubit2: int) -> bool:
+        """
+        Check if there is an edge between two qubits.
+        """
+        return [qubit1, qubit2] in self._edge_list or [qubit2, qubit1] in self._edge_list
+
 
 
 class dynamicvirtualHardwareMapping:
@@ -158,6 +169,13 @@ class virtualHardwareMapping:
                         raise ValueError("Unknown instruction type")
 
         return circuit
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":

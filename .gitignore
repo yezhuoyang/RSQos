@@ -3,3 +3,4 @@ observables/*
 .ipynb_checkpoints/*
 venv/*
 __pycache__/*
+*.png

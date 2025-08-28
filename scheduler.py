@@ -23,6 +23,14 @@ class Scheduler:
         self._current_process_in_execution = []
         self._num_measurement = 0  # Keep track of the number of measurement instructions executed
 
+        self._syndrome_map_history = {}  # Keep track of all syndrome qubits that are used
+
+
+
+    def get_syndrome_map_history(self):
+        return self._syndrome_map_history
+
+
     def get_virtual_hardware_mapping(self) -> virtualHardwareMapping:
         """
         Get the virtual hardware mapping.
@@ -213,6 +221,12 @@ class Scheduler:
 
 
 
+    def get_all_processes(self):
+        """
+        Get all processes in the kernel.
+        """
+        return self._kernel.get_processes()
+
 
 
     def dynamic_scheduling(self):
@@ -280,6 +294,10 @@ class Scheduler:
                         for addr in addresses:
                             if process_instance.is_syndrome_qubit(addr) and not process_instance.syndrome_qubit_is_allocated(addr):
                                 self._current_avalible[next_free_index_] = False
+                                if not next_free_index_ in self._syndrome_map_history.keys():
+                                    self._syndrome_map_history[next_free_index_] = [addr]
+                                else:
+                                    self._syndrome_map_history[next_free_index_].append(addr)
                                 self._used_counter[next_free_index_] = 1
                                 self._num_availble -= 1
                                 next_inst.set_scheduled_mapped_address(addr, next_free_index_)
@@ -358,6 +376,14 @@ class Scheduler:
                                         self._current_avalible[physical_qid] = True
                                         self._num_availble += 1
                                         process_instance.empty_syndrome_qubit_mappings(addr)
+                                """
+                                After measurement, we need to reset the measured qubit to |0>!
+                                """
+                                newReset=instruction(type=Instype.RESET, qubitaddress=[addr], processID=process_instance.get_processID(), time=total_qpu_time)
+                                newReset.set_scheduled_mapped_address(addr, physical_qid)
+                                newReset.set_scheduled_time(total_qpu_time)
+                                final_inst_list.append(newReset)
+
                     if not process_instance.get_status() == ProcessStatus.FINISHED:
                         process_instance.set_status(ProcessStatus.WAIT_FOR_ANSILLA)
             total_qpu_time += move_time
@@ -513,6 +539,47 @@ class Scheduler:
 
             else:
                 print("Unknown instruction type.")
+
+
+
+    def construct_qiskit_circuit_for_backend(self, inst_list):
+        """
+        Construct a qiskit circuit from the instruction list.
+        Also help to visualize the circuit.
+        """
+        qiskit_circuit = qiskit.QuantumCircuit(self._hardware.get_qubit_num(), self._num_measurement)
+        current_measurement = 0
+        for inst in inst_list:
+            if isinstance(inst, instruction):
+                process_id = inst.get_processID()
+                addresses = inst.get_qubitaddress()
+                mapped_addresses = [
+                    f"{inst.get_scheduled_mapped_address(addr)} ({addr})"
+                    for addr in addresses
+                ]
+                addr_str = ", ".join(mapped_addresses)
+                addr_str= f"P{process_id}:" + addr_str
+                match inst.get_type():
+                    case Instype.CNOT:
+                        qiskit_circuit.cx(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), label=addr_str)
+                    case Instype.X:
+                        qiskit_circuit.x(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")                 
+                    case Instype.Y:
+                        qiskit_circuit.y(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}") 
+                    case Instype.Z:
+                        qiskit_circuit.z(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")   
+                    case Instype.H: 
+                        qiskit_circuit.append(HGate(label=f"H(P{process_id})"),[inst.get_scheduled_mapped_address(addresses[0])])
+                        #qiskit_circuit.h(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")
+                    case Instype.RESET:
+                        qiskit_circuit.reset(inst.get_scheduled_mapped_address(addresses[0])) 
+                    case Instype.MEASURE:
+                        qiskit_circuit.measure(inst.get_scheduled_mapped_address(addresses[0]), current_measurement)
+                        current_measurement += 1
+                 
+        # fig = circuit_drawer(qiskit_circuit, output="mpl", fold=-1) 
+        # fig.savefig("my_circuit.png", dpi=300, bbox_inches="tight")
+        return qiskit_circuit
 
 
 
@@ -685,6 +752,7 @@ def generate_example_ppt():
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
+
     virtual_hardware = virtualHardware(qubit_number=7, error_rate=0.001)
 
     return kernel_instance, virtual_hardware
