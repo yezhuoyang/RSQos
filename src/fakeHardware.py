@@ -455,7 +455,12 @@ def generate_simples_example_for_test():
     proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)],size=1,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=1,processID=1))  # Allocate 1 syndrome qubit
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0),vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])  # Measure operation
     proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation        
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)],size=1 ,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=1,processID=1))  # Allocate 2 syndrome qubits
@@ -1489,6 +1494,9 @@ def generate_example_three_procs_40d_40a_with_ancilla_cnots():
 def distribution_fidelity(dist1: dict, dist2: dict) -> float:
     """
     Compute fidelity between two distributions based on L1 distance.
+    1. Normalize both distributions to get probability distributions.
+    2. Compute the L1 distance between the two probability distributions.
+    3. Fidelity = 1 - L1/2, which lies in [0,1].
     
     Args:
         dist1 (dict): key=str (event), value=int (count)
@@ -1584,15 +1592,30 @@ if __name__ == "__main__":
     job = fake_hard_ware.run(transpiled, shots=2000)
     result = job.result()
     counts = result.get_counts()
-    print("\n=== Counts ===")
+    print("\n=== Counts(Fake hardware) ===")
     print(counts)
 
-    print(counts["111"])
 
 
-    print(schedule_instance._measure_index_to_process)
+    '''
+    Get the ideal result
+    '''
+    sim = AerSimulator()
+    tqc = transpile(qc, sim)
 
-    print(schedule_instance._process_measure_index)
+    # Run with 1000 shots
+    result = sim.run(tqc, shots=2000).result()
+    idcounts = result.get_counts(tqc)
+    print("\n=== Counts(Ideal) ===")
+    print(idcounts)
+
+
+
+
+
+    # print(schedule_instance._measure_index_to_process)
+
+    # print(schedule_instance._process_measure_index)
 
 
     final_result=schedule_instance.return_measure_states(counts)

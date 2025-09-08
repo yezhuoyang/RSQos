@@ -52,11 +52,12 @@ class Scheduler:
         After simulation/execution on hardware, return the measurement results for each process.
         """
         all_process_counts = {}
+        
         for process_id, measure_indices in self._process_measure_index.items():
             process_counts = {}
             for bitstring, count in backend_result_counts.items():
                 # Extract the bits corresponding to the current process's measurements
-                extracted_bits = ''.join(bitstring[idx] for idx in measure_indices)
+                extracted_bits = ''.join(bitstring[self._num_measurement-1-idx] for idx in measure_indices)
                 if extracted_bits in process_counts:
                     process_counts[extracted_bits] += count
                 else:
