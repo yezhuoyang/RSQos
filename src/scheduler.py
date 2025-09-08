@@ -346,7 +346,7 @@ class Scheduler:
                 newReset.set_scheduled_mapped_address(addr, physical_qid)
                 newReset.set_scheduled_time(total_qpu_time)
                 final_inst_list.append(newReset)
-                
+
             self.free_resources(process_instance)
             newReset=instruction(type=Instype.BARRIER,qubitaddress=None, processID=process_instance.get_processID(), time=total_qpu_time)
             final_inst_list.append(newReset)            
@@ -535,6 +535,14 @@ class Scheduler:
             """
             for process_instance in processes_stack:
                 if process_instance.get_status() == ProcessStatus.FINISHED and (not process_finish_map[process_instance]):
+                    #Add reset for all data qubits to |0> after the process is done
+                    #TODO: Optimize it in the future development
+                    for addr in process_instance.get_virtual_data_addresses():
+                        physical_qid = process_instance.get_data_qubit_virtual_hardware_mapping(addr)
+                        newReset=instruction(type=Instype.RESET, qubitaddress=[addr], processID=process_instance.get_processID(), time=total_qpu_time)
+                        newReset.set_scheduled_mapped_address(addr, physical_qid)
+                        newReset.set_scheduled_time(total_qpu_time)
+                        final_inst_list.append(newReset)
                     self.free_data_qubit(process_instance)
                     self.free_syndrome_qubit(process_instance)
                     num_finish_process += 1

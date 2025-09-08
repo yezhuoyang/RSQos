@@ -227,8 +227,8 @@ def test_scheduling():
     dis=schedule_instance.calculate_all_pair_distance()
 
 
-    #time1, inst_list1=schedule_instance.dynamic_scheduling()
-    time1, inst_list1=schedule_instance.baseline_scheduling()
+    time1, inst_list1=schedule_instance.dynamic_scheduling()
+    #time1, inst_list1=schedule_instance.baseline_scheduling()
     schedule_instance.print_dynamic_instruction_list(inst_list1)
     qc=schedule_instance.construct_qiskit_circuit_for_backend(inst_list1)
 
@@ -292,7 +292,7 @@ def test_scheduling():
 
    
 
-    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.0000, error_rate_2q=0.0000, p_reset=0.0000, p_meas=0.0000))
+    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.005, error_rate_2q=0.05, p_reset=0.001, p_meas=0.02))
     tqc = transpile(transpiled, sim)
     result = sim.run(tqc, shots=2000).result()
     counts = result.get_counts(tqc)
