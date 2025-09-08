@@ -6,7 +6,9 @@ from syscall import *
 import qiskit
 from qiskit.circuit import Gate
 from qiskit.visualization import circuit_drawer
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
+from qiskit_aer import AerSimulator  # <- use AerSimulator (Qiskit 2.x)
+
 
 
 class ProcessStatus(Enum):
@@ -62,6 +64,12 @@ class process:
         """
         self._syndrome_qubit_virtual_hardware_mapping = {}  # type: dict[virtualAddress, int]
         self._syndrome_qubit_is_allocated = {}  # type: dict[virtualAddress, bool]
+        """
+        Qiskit circuit representation of the process
+        """
+        self._qiskit_circuit = None
+        
+
 
     def set_status(self, status: ProcessStatus):
         self._status = status
@@ -323,7 +331,8 @@ class process:
         return self._consumed_qpu_time
 
 
-    def construct_qiskit_diagram(self):
+
+    def construct_qiskit_circuit(self, add_syscall_gates=False) -> QuantumCircuit:
         """
         Construct a qiskit circuit from the instruction list.
         Also help to visualize the circuit.
@@ -370,6 +379,8 @@ class process:
                 
 
             elif isinstance(inst, syscall):
+                if not add_syscall_gates:
+                    continue
                 if isinstance(inst, syscall_magic_state_distillation):
                     addresses = inst.get_address()
                     qiskitaddress=[]
@@ -384,11 +395,28 @@ class process:
                     qubit_num = self._num_data_qubits + self._num_syndrome_qubits
                     my_gate = Gate(name=f"{inst.get_simple_name()}, P{self._processID}", num_qubits=qubit_num, params=[])
                     qiskit_circuit.append(my_gate, list(range(qubit_num)))
+        self._qiskit_circuit = qiskit_circuit
+        return qiskit_circuit
+
+
+    def simulate_circuit(self):
+        # Choose simulator and transpile for it
+        sim = AerSimulator()
+        tqc = transpile(self._qiskit_circuit, sim)
+
+        # Run with 1000 shots
+        result = sim.run(tqc, shots=1000).result()
+        counts = result.get_counts(tqc)
+        print(counts)
+
+
+
+
+    def construct_qiskit_diagram(self):
         style = {
             "fontsize": 15  # increase/decrease as needed
         }
-
-        fig = circuit_drawer(qiskit_circuit, output="mpl", fold=-1, style=style) 
+        fig = circuit_drawer(self._qiskit_circuit, output="mpl", fold=-1, style=style) 
         fig.savefig(f"circuit_P{self._processID}.png", dpi=300, bbox_inches="tight")
 
 
@@ -411,4 +439,7 @@ if __name__ == "__main__":
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
 
-    proc1.construct_qiskit_diagram()
+    #proc1.construct_qiskit_diagram()
+
+    proc1.construct_qiskit_circuit()
+    proc1.simulate_circuit()

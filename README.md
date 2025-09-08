@@ -131,3 +131,10 @@ The kernel manage all these process, optimize the resource usage.
 - [x] For T-factory syscall, add space requirement.
 - [x] Consider T-factory scheduling in the baseline algorithm.
 - [x] Consider T-factory scheduling in the round robin algorithm. 
+- [X] Construct a smaller fake backend with 10 qubits
+- [ ] Separate readout information of multiple processes
+- [X] For each process, get the ideal output distribution
+- [ ] Test and verify the correctness of process output
+- [ ] Analyze and add a cost function for routing
+- [ ] Routing aware scheduling algorithm
+- [ ] Understand the input/output format of IBM cloud by a free small backend

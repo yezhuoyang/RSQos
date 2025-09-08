@@ -11,6 +11,40 @@ from process import process
 import numpy as np
 
 
+
+
+def construct_10_qubit_hardware():
+    NUM_QUBITS = 10
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9]]  # linear chain
+    BASIS = ["cx", "id", "rz", "sx", "x"]  # add more *only* if truly native
+    SINGLE_QUBIT_GATE_LENGTH_NS = 32       # example: 0.222 ns timestep
+    SINGLE_QUBIT_GATE_LENGTH_NS = 88       # example: 0.222 ns timestep
+    READOUT_LENGTH_NS = 2584     # example measurement timestep
+
+    backend = GenericBackendV2(
+        num_qubits=NUM_QUBITS,
+        basis_gates=BASIS,         # optional
+        coupling_map=COUPLING,     # strongly recommended
+        control_flow=True,        # set True if you want dynamic circuits            
+        seed=1234,                 # reproducible auto-generated props
+        noise_info=True            # attach plausible noise/durations
+    )
+
+    return backend    
+
+
+def get_10_qubit_hardware_coords() -> list[tuple[float, float]]:
+    edge_length = 5
+    coords = [ ]
+    for i in range(10):
+        if i<5:
+            coords.append( (float(i*edge_length), 0.0) )
+        else:
+            coords.append( (float((i-5)*edge_length), -edge_length))
+    return coords
+
+
+
 def construct_fake_ibm_pittsburgh():
     NUM_QUBITS = 156
 
@@ -408,6 +442,49 @@ class HardwareManager:
 
     def get_backend(self) -> GenericBackendV2:
         return self._backend
+
+
+
+
+def generate_simples_example_for_test():
+    vdata1 = virtualSpace(size=1, label="vdata1")    
+    vdata1.allocate_range(0,1)
+    vsyn1 = virtualSpace(size=1, label="vsyn1", is_syndrome=True)
+    vsyn1.allocate_range(0,1)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1)],size=2,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=1,processID=1))  # Allocate 1 syndrome qubit
+    proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0),vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation        
+    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)],size=1 ,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=1,processID=1))  # Allocate 2 syndrome qubits
+
+    vdata2 = virtualSpace(size=1, label="vdata2")    
+    vdata2.allocate_range(0,1)
+    vsyn2 = virtualSpace(size=1, label="vsyn2", is_syndrome=True)
+    vsyn2.allocate_range(0,1)
+    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1)],size=1,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=1,processID=2))  # Allocate 1 syndrome qubit
+    proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0),vsyn2.get_address(0)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation        
+    proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)],size=1 ,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=1,processID=2))  # Allocate 2 syndrome qubits
+
+
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9]]  # linear chain
+
+
+    #print(proc2)
+    kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+
+    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001,edge_list=COUPLING)
+
+    return kernel_instance, virtual_hardware
 
 
 

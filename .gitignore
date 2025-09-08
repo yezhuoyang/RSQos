@@ -4,3 +4,4 @@ observables/*
 venv/*
 __pycache__/*
 *.png
+src/__pycache__/*
