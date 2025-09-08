@@ -9,13 +9,14 @@ from qiskit.transpiler import CouplingMap
 from scheduler import *
 from process import process
 import numpy as np
-
+from qiskit_aer.noise import NoiseModel, QuantumError, ReadoutError
+from qiskit_aer.noise.errors import depolarizing_error, thermal_relaxation_error,pauli_error
 
 
 
 def construct_10_qubit_hardware():
     NUM_QUBITS = 10
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9]]  # linear chain
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
     BASIS = ["cx", "id", "rz", "sx", "x"]  # add more *only* if truly native
     SINGLE_QUBIT_GATE_LENGTH_NS = 32       # example: 0.222 ns timestep
     SINGLE_QUBIT_GATE_LENGTH_NS = 88       # example: 0.222 ns timestep
@@ -34,7 +35,7 @@ def construct_10_qubit_hardware():
 
 
 def get_10_qubit_hardware_coords() -> list[tuple[float, float]]:
-    edge_length = 5
+    edge_length = 1
     coords = [ ]
     for i in range(10):
         if i<5:
@@ -42,6 +43,78 @@ def get_10_qubit_hardware_coords() -> list[tuple[float, float]]:
         else:
             coords.append( (float((i-5)*edge_length), -edge_length))
     return coords
+
+
+def plot_process_schedule_on_10_qubit_hardware(coupling_edges: list[list[int]],
+                               syndrome_qubit_history: dict[int, list[int]],
+                               process_list: list,
+                               out_png: str = "hardware_mapping.png",
+                               figsize=(12, 4.5)):      # a bit shorter is fine; width stays large
+    coords = get_10_qubit_hardware_coords()
+    cm = CouplingMap(coupling_edges)
+
+    pairs = cm.get_edges()
+    undirected = sorted(set(tuple(sorted((a, b))) for a, b in pairs))
+
+    # Better layout engine than tight_layout for drawings
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+
+    # edges
+    for a, b in undirected:
+        xa, ya = coords[a]; xb, yb = coords[b]
+        ax.plot([xa, xb], [ya, yb], linewidth=1.5, alpha=0.7, color="#20324d")
+
+    # nodes
+    xs = [xy[0] for xy in coords]; ys = [xy[1] for xy in coords]
+    ax.scatter(xs, ys, s=620, color="#0b1e3f", zorder=3)
+
+    # indices
+    for i, (x, y) in enumerate(coords):
+        ax.text(x, y, str(i), ha="center", va="center", fontsize=7, color="white",
+                zorder=4, clip_on=False)  # avoid text clipping
+
+    # process outlines
+    colors = plt.cm.tab10(np.linspace(0, 1, len(process_list)))
+    for proc, color in zip(process_list, colors):
+        vaddress = proc.get_virtual_data_addresses()
+        label_physical_map = {}
+        for vaddr in vaddress:
+            phys = proc.get_data_qubit_virtual_hardware_mapping(vaddr)
+            if phys is not None:
+                label_physical_map[phys] = str(vaddr)
+
+        for phys, label in label_physical_map.items():
+            x, y = coords[phys]
+            ax.scatter([x], [y], s=780, facecolors="none", edgecolors=color,
+                       linewidths=2.6, zorder=5)
+            ax.text(x, y + 0.1, label, ha="center", va="bottom",
+                    fontsize=8, color=color, weight="bold", zorder=6, clip_on=False)
+
+    # syndrome labels
+    for phys in syndrome_qubit_history.keys():
+        x, y = coords[phys]
+        vaddress_list = syndrome_qubit_history[phys]
+        label = ",".join([str(vaddr) for vaddr in vaddress_list[:2]])
+        if len(vaddress_list) > 2:
+            label += ",..."
+        ax.scatter([x], [y], s=780, facecolors="none", edgecolors="orange",
+                   linewidths=2.6, zorder=5)
+        ax.text(x, y + 0.1, label, ha="center", va="bottom",
+                fontsize=8, color="blue", weight="bold", zorder=6, clip_on=False)
+
+    ax.set_aspect("equal", adjustable="datalim")
+
+    # ---- Key fix: add padding around data limits ----
+    pad = 0.75                     # increase if labels still feel tight
+    ax.set_xlim(min(xs) - pad, max(xs) + pad)
+    ax.set_ylim(min(ys) - pad, max(ys) + pad)
+
+    ax.axis("off")
+
+    # Avoid overly tight cropping; keep a little page margin
+    fig.savefig(out_png, dpi=220, bbox_inches="tight", pad_inches=0.3)
+    plt.close(fig)
+
 
 
 
@@ -1525,6 +1598,24 @@ def distribution_fidelity(dist1: dict, dist2: dict) -> float:
 
 
 
+def build_noise_model(error_rate_1q=0.001, error_rate_2q=0.01, p_reset=0.001, p_meas=0.01):
+    custom_noise_model = NoiseModel()
+    
+    error_reset = pauli_error([('X', p_reset), ('I', 1 - p_reset)])
+    error_meas = pauli_error([('X',p_meas), ('I', 1 - p_meas)])
+
+    custom_noise_model.add_all_qubit_quantum_error(error_reset,"reset")
+
+    custom_noise_model.add_all_qubit_quantum_error(error_meas,"measure")
+    custom_noise_model.add_all_qubit_quantum_error(depolarizing_error(error_rate_1q, 1), ['id','rx','rz','sx','x'])
+
+    # Add a depolarizing error to two-qubit gates on specific qubits
+    custom_noise_model.add_all_qubit_quantum_error(depolarizing_error(error_rate_2q, 2), ['cz','rzz'])
+
+
+    return custom_noise_model
+
+
 # ========================  MAIN  ========================
 if __name__ == "__main__":
 
@@ -1581,19 +1672,32 @@ if __name__ == "__main__":
 
     process_list = schedule_instance.get_all_processes()
     syndrome_history = schedule_instance.get_syndrome_map_history()
-    # plot_process_schedule_on_pittsburgh(
-    #     coupling_edges= fake_hard_ware.coupling_map,
-    #     syndrome_qubit_history=syndrome_history,
-    #     process_list=process_list,
-    #     out_png="hardware_processes.png",
-    # )
+    plot_process_schedule_on_10_qubit_hardware(
+        coupling_edges= fake_hard_ware.coupling_map,
+        syndrome_qubit_history=syndrome_history,
+        process_list=process_list,
+        out_png="hardware_processes.png",
+    )
+    
+
+
+    
 
     # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
-    job = fake_hard_ware.run(transpiled, shots=2000)
-    result = job.result()
-    counts = result.get_counts()
-    print("\n=== Counts(Fake hardware) ===")
-    print(counts)
+
+    # job = fake_hard_ware.run(transpiled, shots=2000)
+    # result = job.result()
+    # counts = result.get_counts()
+    # print("\n=== Counts(Fake hardware) ===")
+    # print(counts)
+
+
+    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.01, error_rate_2q=0.05, p_reset=0.05, p_meas=0.05))
+    tqc = transpile(transpiled, sim)
+    result = sim.run(tqc, shots=2000).result()
+    counts = result.get_counts(tqc)
+    # print("\n=== Counts(Fake hardware) ===")
+    print(counts)   
 
 
 
