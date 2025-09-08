@@ -17,6 +17,10 @@ class virtualHardware:
         self._edge_list = edge_list  # List of tuples representing connections between qubits
 
 
+    def get_edge_list(self) -> List[List[int]]:
+        return self._edge_list
+
+
     def get_qubit_num(self) -> int:
         return self._physical_qubits
 

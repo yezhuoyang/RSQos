@@ -8,6 +8,37 @@ import qiskit
 from qiskit.circuit import Gate
 from qiskit.visualization import circuit_drawer
 from qiskit.circuit.library import HGate
+from collections import deque
+
+
+def all_pairs_distances(n, edges):
+    """
+    n: number of vertices labeled 0..n-1
+    edges: list of [u, v] pairs (undirected)
+    returns: n x n list of ints, distances; -1 means unreachable
+    """
+    # build adjacency list
+    adj = [[] for _ in range(n)]
+    for u, v in edges:
+        if not (0 <= u < n and 0 <= v < n):
+            raise ValueError(f"Edge ({u},{v}) out of range for n={n}")
+        adj[u].append(v)
+        adj[v].append(u)
+
+    # BFS from every source
+    dist = [[-1] * n for _ in range(n)]
+    for s in range(n):
+        dq = deque([s])
+        dist[s][s] = 0
+        while dq:
+            u = dq.popleft()
+            for w in adj[u]:
+                if dist[s][w] == -1:
+                    dist[s][w] = dist[s][u] + 1
+                    dq.append(w)
+    return dist
+
+
 class Scheduler:
     def __init__(self, kernel_instance: Kernel, hardware_instance: virtualHardware):
         self._kernel = kernel_instance
@@ -29,7 +60,21 @@ class Scheduler:
         """
         self._measure_index_to_process = {}  # Map the index of measurement instruction to the process ID that generates it
         self._process_measure_index = {}  # Map the process ID to the list of measurement instruction indices it generates
+        """
+        Store the distance between every pair of qubits on the hardware.
+        """
+        self._all_pair_distance = None
 
+
+
+    def calculate_all_pair_distance(self):
+        """
+        Calculate the distance between every pair of qubits on the hardware.
+        """
+        edges = self._hardware.get_edge_list()
+        n = self._hardware.get_qubit_num()
+        self._all_pair_distance = all_pairs_distances(n, edges)
+        return self._all_pair_distance
 
 
 

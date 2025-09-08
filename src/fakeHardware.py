@@ -1814,6 +1814,9 @@ if __name__ == "__main__":
 
 
 
+    dis=schedule_instance.calculate_all_pair_distance()
+
+
     #time1, inst_list1=schedule_instance.dynamic_scheduling()
     time1, inst_list1=schedule_instance.baseline_scheduling()
     schedule_instance.print_dynamic_instruction_list(inst_list1)
