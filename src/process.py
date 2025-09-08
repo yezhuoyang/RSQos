@@ -332,6 +332,7 @@ class process:
 
 
 
+
     def construct_qiskit_circuit(self, add_syscall_gates=False) -> QuantumCircuit:
         """
         Construct a qiskit circuit from the instruction list.
@@ -376,7 +377,8 @@ class process:
                     case Instype.MEASURE:
                         qiskit_circuit.measure(qiskitaddress[0], current_measurement)
                         current_measurement += 1
-                
+                        #Add reset after measurement
+                        qiskit_circuit.reset(qiskitaddress[0])
 
             elif isinstance(inst, syscall):
                 if not add_syscall_gates:

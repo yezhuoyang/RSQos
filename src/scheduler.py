@@ -87,7 +87,6 @@ class Scheduler:
             process_instance.construct_qiskit_circuit()
             counts = process_instance.simulate_circuit(shots=shots)
             process_id = process_instance.get_processID()
-            print(f"\n=== Ideal Counts for Process {process_id} ===")
             all_process_ideal_counts[process_id] = counts
         return all_process_ideal_counts
 
@@ -103,6 +102,8 @@ class Scheduler:
             for bitstring, count in backend_result_counts.items():
                 # Extract the bits corresponding to the current process's measurements
                 extracted_bits = ''.join(bitstring[self._num_measurement-1-idx] for idx in measure_indices)
+                # Reverse the bitstring to match Qiskit's output format
+                extracted_bits = extracted_bits[::-1]
                 if extracted_bits in process_counts:
                     process_counts[extracted_bits] += count
                 else:
@@ -338,7 +339,14 @@ class Scheduler:
                             newReset.set_scheduled_time(total_qpu_time)
                             final_inst_list.append(newReset)
 
-
+            #Reset all data qubits to |0> after the process is done
+            for addr in process_instance.get_virtual_data_addresses():
+                physical_qid = self._virtual_hardware_mapping.get_physical_qubit(addr)
+                newReset=instruction(type=Instype.RESET, qubitaddress=[addr], processID=process_instance.get_processID(), time=total_qpu_time)
+                newReset.set_scheduled_mapped_address(addr, physical_qid)
+                newReset.set_scheduled_time(total_qpu_time)
+                final_inst_list.append(newReset)
+                
             self.free_resources(process_instance)
             newReset=instruction(type=Instype.BARRIER,qubitaddress=None, processID=process_instance.get_processID(), time=total_qpu_time)
             final_inst_list.append(newReset)            
@@ -718,6 +726,8 @@ class Scheduler:
                     case Instype.MEASURE:
                         qiskit_circuit.measure(inst.get_scheduled_mapped_address(addresses[0]), current_measurement)
                         current_measurement += 1
+                        #Add reset after measurement
+                        qiskit_circuit.reset(inst.get_scheduled_mapped_address(addresses[0])) 
                         
                  
         # fig = circuit_drawer(qiskit_circuit, output="mpl", fold=-1) 

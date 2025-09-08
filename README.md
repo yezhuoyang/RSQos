@@ -266,3 +266,4 @@ The kernel manage all these process, optimize the resource usage.
 - [ ] Create small baseline(With 10 qubits)
 - [ ] Understand the input/output format of IBM cloud by a free small backend
 - [ ] Scheduling algorithm with fixed syndrome qubit area
+- [ ] Now a reset is automatically inserted after measurement, optimize it in the future development
