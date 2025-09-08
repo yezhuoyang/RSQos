@@ -519,6 +519,159 @@ class HardwareManager:
 
 
 
+
+
+def generate_example_ppt10_on_10_qubit_device():
+    vdata1 = virtualSpace(size=3, label="vdata1")
+    vdata1.allocate_range(0,2)
+    vsyn1 = virtualSpace(size=2, label="vsyn1", is_syndrome=True)
+    vsyn1.allocate_range(0,1)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3,processID=1))
+    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1)],size=2,processID=1))
+    proc1.add_instruction(Instype.H, [vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.CNOT, [vsyn1.get_address(0),vsyn1.get_address(1)])
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])
+    proc1.add_instruction(Instype.CNOT, [vsyn1.get_address(0), vsyn1.get_address(1)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])
+    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))
+    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1)],size=2,processID=1))
+
+
+    vdata2 = virtualSpace(size=3, label="vdata2")
+    vdata2.allocate_range(0,2)
+    vsyn2 = virtualSpace(size=2, label="vsyn2", is_syndrome=True)
+    vsyn2.allocate_range(0,1)
+    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3,processID=2))
+    proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1)],size=2,processID=2))
+    proc2.add_instruction(Instype.H, [vsyn2.get_address(0)])
+    proc2.add_instruction(Instype.CNOT, [vsyn2.get_address(0),vsyn2.get_address(1)])
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(0)])
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(1)])
+    proc2.add_instruction(Instype.CNOT, [vsyn2.get_address(0), vsyn2.get_address(1)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)])
+    proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3 ,processID=2))
+    proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1)],size=2,processID=2))
+
+    # ---- proc3 ----
+    vdata3 = virtualSpace(size=3, label="vdata3")
+    vdata3.allocate_range(0,2)
+    vsyn3 = virtualSpace(size=2, label="vsyn3", is_syndrome=True)
+    vsyn3.allocate_range(0,1)
+    proc3 = process(processID=3, start_time=0, vdataspace=vdata3, vsyndromespace=vsyn3)
+    proc3.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata3.get_address(0),vdata3.get_address(1),vdata3.get_address(2)],size=3,processID=3))
+    proc3.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn3.get_address(0),vsyn3.get_address(1)],size=2,processID=3))
+    proc3.add_instruction(Instype.H, [vsyn3.get_address(0)])
+    proc3.add_instruction(Instype.CNOT, [vsyn3.get_address(0),vsyn3.get_address(1)])
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(0), vsyn3.get_address(0)])
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(1), vsyn3.get_address(1)])
+    proc3.add_instruction(Instype.CNOT, [vsyn3.get_address(0), vsyn3.get_address(1)])
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(1)])
+    proc3.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata3.get_address(0),vdata3.get_address(1),vdata3.get_address(2)],size=3 ,processID=3))
+    proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0),vsyn3.get_address(1)],size=2,processID=3))
+
+
+
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9]]  # linear chain
+
+
+    #print(proc2)
+    kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    kernel_instance.add_process(proc3)
+
+    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001,edge_list=COUPLING)
+
+    return kernel_instance, virtual_hardware
+
+
+
+def generate_simples_example_for_test_2():
+    vdata1 = virtualSpace(size=3, label="vdata1")    
+    vdata1.allocate_range(0,2)
+    vsyn1 = virtualSpace(size=3, label="vsyn1", is_syndrome=True)
+    vsyn1.allocate_range(0,2)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)],size=3,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=3,processID=1))  # Allocate 1 syndrome qubit
+    proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.X, [vdata1.get_address(1)])
+    proc1.add_instruction(Instype.X, [vdata1.get_address(2)])
+    proc1.add_instruction(Instype.X, [vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation    
+    proc1.add_instruction(Instype.X, [vsyn1.get_address(1)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])  # Measure operation    
+    proc1.add_instruction(Instype.X, [vsyn1.get_address(2)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(2)])  # Measure operation    
+    proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0),vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])  # Measure operation
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation        
+    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)],size=3 ,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=3,processID=1))  # Allocate 2 syndrome qubits
+
+    vdata2 = virtualSpace(size=3, label="vdata2")    
+    vdata2.allocate_range(0,2)
+    vsyn2 = virtualSpace(size=3, label="vsyn2", is_syndrome=True)
+    vsyn2.allocate_range(0,2)
+    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)],size=3,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=3,processID=2))  # Allocate 1 syndrome qubit
+    proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
+    proc2.add_instruction(Instype.X, [vdata2.get_address(1)])
+    proc2.add_instruction(Instype.X, [vdata2.get_address(2)])
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0),vsyn2.get_address(0)])
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])  # Measure operation    
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation  
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1),vsyn2.get_address(1)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)])  # Measure operation      
+    proc2.add_instruction(Instype.CNOT, [vdata2.get_address(2),vsyn2.get_address(2)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(2)])  # Measure operation           
+    proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)],size=3 ,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=3,processID=2))  # Allocate 2 syndrome qubits
+
+
+
+
+    vdata3 = virtualSpace(size=1, label="vdata3")    
+    vdata3.allocate_range(0,0)
+    vsyn3 = virtualSpace(size=1, label="vsyn3", is_syndrome=True)
+    vsyn3.allocate_range(0,0)
+    proc3 = process(processID=3, start_time=0, vdataspace=vdata3, vsyndromespace=vsyn3)
+    proc3.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata3.get_address(0)],size=1,processID=3))  # Allocate 2 data qubits
+    proc3.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 1 syndrome qubit
+    proc3.add_instruction(Instype.X, [vdata3.get_address(0)])
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(0),vsyn3.get_address(0)])
+    proc3.add_instruction(Instype.MEASURE, [vdata3.get_address(0)])  # Measure operation    
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])  # Measure operation        
+    proc3.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata3.get_address(0)],size=1 ,processID=3))  # Allocate 2 data qubits
+    proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 2 syndrome qubits
+
+
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9]]  # linear chain
+
+
+    #print(proc2)
+    kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
+    kernel_instance.add_process(proc1)
+    kernel_instance.add_process(proc2)
+    kernel_instance.add_process(proc3)
+
+    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001,edge_list=COUPLING)
+
+    return kernel_instance, virtual_hardware
+
+
+
 def generate_simples_example_for_test():
     vdata1 = virtualSpace(size=1, label="vdata1")    
     vdata1.allocate_range(0,0)
@@ -553,6 +706,23 @@ def generate_simples_example_for_test():
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=1,processID=2))  # Allocate 2 syndrome qubits
 
 
+
+
+    vdata3 = virtualSpace(size=1, label="vdata3")    
+    vdata3.allocate_range(0,0)
+    vsyn3 = virtualSpace(size=1, label="vsyn3", is_syndrome=True)
+    vsyn3.allocate_range(0,0)
+    proc3 = process(processID=3, start_time=0, vdataspace=vdata3, vsyndromespace=vsyn3)
+    proc3.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata3.get_address(0)],size=1,processID=3))  # Allocate 2 data qubits
+    proc3.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 1 syndrome qubit
+    proc3.add_instruction(Instype.X, [vdata3.get_address(0)])
+    proc3.add_instruction(Instype.CNOT, [vdata3.get_address(0),vsyn3.get_address(0)])
+    proc3.add_instruction(Instype.MEASURE, [vdata3.get_address(0)])  # Measure operation    
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])  # Measure operation        
+    proc3.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata3.get_address(0)],size=1 ,processID=3))  # Allocate 2 data qubits
+    proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 2 syndrome qubits
+
+
     COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9]]  # linear chain
 
 
@@ -560,6 +730,7 @@ def generate_simples_example_for_test():
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
+    kernel_instance.add_process(proc3)
 
     virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001,edge_list=COUPLING)
 
@@ -1596,8 +1767,6 @@ def distribution_fidelity(dist1: dict, dist2: dict) -> float:
 
 
 
-
-
 def build_noise_model(error_rate_1q=0.001, error_rate_2q=0.01, p_reset=0.001, p_meas=0.01):
     custom_noise_model = NoiseModel()
     
@@ -1616,16 +1785,37 @@ def build_noise_model(error_rate_1q=0.001, error_rate_2q=0.01, p_reset=0.001, p_
     return custom_noise_model
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ========================  MAIN  ========================
 if __name__ == "__main__":
 
 
 
 
-    kernel_instance, virtual_hardware =generate_simples_example_for_test()
-    schedule_instance=Scheduler(kernel_instance,virtual_hardware)
-    time1, inst_list1=schedule_instance.dynamic_scheduling()
-    #time1, inst_list1=schedule_instance.baseline_scheduling()
+    kernel_instance, virtual_hardware =generate_simples_example_for_test_2()
+    #kernel_instance, virtual_hardware = generate_example_ppt10_on_10_qubit_device()
+
+    schedule_instance = Scheduler(kernel_instance=kernel_instance, hardware_instance=virtual_hardware)
+
+
+
+    #time1, inst_list1=schedule_instance.dynamic_scheduling()
+    time1, inst_list1=schedule_instance.baseline_scheduling()
     schedule_instance.print_dynamic_instruction_list(inst_list1)
     qc=schedule_instance.construct_qiskit_circuit_for_backend(inst_list1)
 
@@ -1635,8 +1825,8 @@ if __name__ == "__main__":
     # fig_t.savefig("before_transpiled.png", dpi=200, bbox_inches="tight")
     # plt.close(fig_t)
 
-    qc.draw("mpl", fold=-1).show()
-    print(qc.num_qubits)
+    # qc.draw("mpl", fold=-1).show()
+    # print(qc.num_qubits)
 
     # 0) Fake 156-qubit backend (your Pittsburgh layout)
     fake_hard_ware = construct_10_qubit_hardware()
@@ -1649,7 +1839,6 @@ if __name__ == "__main__":
     # 2) Transpile to hardware; map 15 logical qubits onto a single long row
     #    (contiguous physical qubits minimize SWAPs on your lattice)
     initial_layout = [i for i in range(10)]  # logical i -> physical i
-
 
 
 
@@ -1681,18 +1870,16 @@ if __name__ == "__main__":
     
 
 
-    
 
     # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
 
-    # job = fake_hard_ware.run(transpiled, shots=2000)
-    # result = job.result()
-    # counts = result.get_counts()
-    # print("\n=== Counts(Fake hardware) ===")
-    # print(counts)
+    job = fake_hard_ware.run(transpiled, shots=2000)
+    result = job.result()
+    running_time=result.time_taken
 
+   
 
-    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.01, error_rate_2q=0.05, p_reset=0.05, p_meas=0.05))
+    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.0000, error_rate_2q=0.0000, p_reset=0.0000, p_meas=0.0000))
     tqc = transpile(transpiled, sim)
     result = sim.run(tqc, shots=2000).result()
     counts = result.get_counts(tqc)
@@ -1718,19 +1905,35 @@ if __name__ == "__main__":
 
 
     # print(schedule_instance._measure_index_to_process)
-
     # print(schedule_instance._process_measure_index)
 
 
     final_result=schedule_instance.return_measure_states(counts)
-    print(final_result)
+    #print(final_result)
 
 
     ideal_result=schedule_instance.return_process_ideal_output(shots=2000)
-    print(ideal_result)
+    #print(ideal_result)
 
 
-    fidelity1 = distribution_fidelity(final_result[1], ideal_result[1])
-    fidelity2 = distribution_fidelity(final_result[2], ideal_result[2])
-    print(f"Fidelity for process 1: {fidelity1:.4f}")
-    print(f"Fidelity for process 2: {fidelity2:.4f}")
+
+    average_fidelity=0
+    for pid in final_result.keys():
+        print("Ideal result for process ", pid)
+        print(ideal_result[pid])
+        print("Final result for process ", pid)
+        print(final_result[pid])
+        fidelity=distribution_fidelity(final_result[pid], ideal_result[pid])
+        average_fidelity+=fidelity
+        print(f"Fidelity for process {pid}: {fidelity:.4f}")
+
+
+
+
+    print("The TRANSPILED circuit depth is:", transpiled .depth())
+
+    print("\n=== Time taken:===")
+    print(running_time)
+
+    average_fidelity/=len(final_result.keys())
+    print(f"Average fidelity: {average_fidelity:.4f}")

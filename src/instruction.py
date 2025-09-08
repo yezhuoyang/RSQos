@@ -24,6 +24,7 @@ class Instype(Enum):
     CNOT = 4
     RESET = 5
     MEASURE = 6
+    BARRIER = 7  
 
 
 """
@@ -56,6 +57,8 @@ def get_clocktime(type: Instype) -> int:
             return RESET_CLOCKTIME
         case Instype.MEASURE:
             return MEASURE_CLOCKTIME
+        case Instype.BARRIER:
+            return 0  # Barrier operations do not consume clock time
         case _:
             raise ValueError("Unknown instruction type")
 
@@ -86,6 +89,8 @@ def get_gate_type_name(type: Instype) -> str:
             return "RESET"
         case Instype.MEASURE:
             return "MEASURE"
+        case Instype.BARRIER:
+            return "BARRIER"
         case _:
             raise ValueError("Unknown instruction type")
 

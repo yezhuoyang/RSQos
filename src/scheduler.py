@@ -197,6 +197,7 @@ class Scheduler:
             self._used_counter[next_free_index_] = 1
             self._num_availble -= 1
             self._virtual_hardware_mapping.add_mapping(addr, next_free_index_)
+            process_instance.set_data_qubit_virtual_hardware_mapping(addr, next_free_index_)
             next_free_index_=self.next_free_index(next_free_index_+1)
 
         next_free_index_=self.next_free_index(0)
@@ -211,14 +212,33 @@ class Scheduler:
                 self._num_availble -= 1
                 self._mapped_to_syndrome[next_free_index_] = True
                 self._virtual_hardware_mapping.add_mapping(addr, next_free_index_)
+                process_instance.set_syndrome_qubit_virtual_hardware_mapping(addr, next_free_index_)
                 next_free_index_ = self.next_free_index(next_free_index_ + 1)
             else:
                 least_busy_qubit = self.least_busy_syndrome_qubit()
                 if least_busy_qubit != -1:
                     self._used_counter[least_busy_qubit] += 1
                     self._virtual_hardware_mapping.add_mapping(addr, least_busy_qubit)
+                    process_instance.set_syndrome_qubit_virtual_hardware_mapping(addr, least_busy_qubit)
                 else:
                     assert False, "No available qubit found for syndrome mapping."
+
+
+
+    def advanced_scheduling(self):
+        """
+        Dynamic scheduling algorithm with sharing syndrome qubits between processes in the same batch.
+        Also, consider the connectivity of hardware when allocating syndrome qubits.
+        """
+        pass
+
+
+    def scheduling_with_out_sharing_syndrome_qubit(self):
+        """
+        Put processes into a batch. But not sharying resources between processes in the same batch.
+        """
+        pass
+
 
 
     def baseline_scheduling(self):
@@ -234,7 +254,7 @@ class Scheduler:
         num_finish_process = 0
         total_qpu_time = 0
         final_inst_list = []
-
+        current_measurement_index = 0 
         for process_instance in processes_stack:
             if self.have_enough_resources(process_instance):
                 self.allocate_resources(process_instance)
@@ -244,9 +264,6 @@ class Scheduler:
             while not process_instance.is_done():
                 inst=process_instance.execute_instruction(total_qpu_time)
 
-                if isinstance(inst, instruction):
-                    if inst.is_measurement():
-                        self._num_measurement += 1
 
                 if isinstance(inst, instruction):
                     total_qpu_time += get_clocktime(inst.get_type())
@@ -257,8 +274,29 @@ class Scheduler:
                     physical_qid = self._virtual_hardware_mapping.get_physical_qubit(addr)
                     inst.set_scheduled_mapped_address(addr, physical_qid)
                 final_inst_list.append(inst)
-            self.free_resources(process_instance)
 
+                if isinstance(inst, instruction):
+                    if inst.is_measurement():
+                        self._num_measurement += 1
+                        self._measure_index_to_process[ current_measurement_index ] = process_instance.get_processID()
+                        if not process_instance.get_processID() in self._process_measure_index.keys():
+                            self._process_measure_index[ process_instance.get_processID() ] = [current_measurement_index]
+                        else:
+                            self._process_measure_index[ process_instance.get_processID() ].append(current_measurement_index)
+                        current_measurement_index += 1
+
+
+                        for addr in inst.get_qubitaddress():
+                            physical_qid = self._virtual_hardware_mapping.get_physical_qubit(addr)
+                            newReset=instruction(type=Instype.RESET, qubitaddress=[addr], processID=process_instance.get_processID(), time=total_qpu_time)
+                            newReset.set_scheduled_mapped_address(addr, physical_qid)
+                            newReset.set_scheduled_time(total_qpu_time)
+                            final_inst_list.append(newReset)
+
+
+            self.free_resources(process_instance)
+            newReset=instruction(type=Instype.BARRIER,qubitaddress=None, processID=process_instance.get_processID(), time=total_qpu_time)
+            final_inst_list.append(newReset)            
         return total_qpu_time,final_inst_list
 
 
@@ -426,13 +464,14 @@ class Scheduler:
                                         self._current_avalible[physical_qid] = True
                                         self._num_availble += 1
                                         process_instance.empty_syndrome_qubit_mappings(addr)
-                                """
-                                After measurement, we need to reset the measured qubit to |0>!
-                                """
-                                newReset=instruction(type=Instype.RESET, qubitaddress=[addr], processID=process_instance.get_processID(), time=total_qpu_time)
-                                newReset.set_scheduled_mapped_address(addr, physical_qid)
-                                newReset.set_scheduled_time(total_qpu_time)
-                                final_inst_list.append(newReset)
+
+                                    """
+                                    After measurement, we need to reset the measured qubit to |0>!
+                                    """
+                                    newReset=instruction(type=Instype.RESET, qubitaddress=[addr], processID=process_instance.get_processID(), time=total_qpu_time)
+                                    newReset.set_scheduled_mapped_address(addr, physical_qid)
+                                    newReset.set_scheduled_time(total_qpu_time)
+                                    final_inst_list.append(newReset)
 
                     if not process_instance.get_status() == ProcessStatus.FINISHED:
                         process_instance.set_status(ProcessStatus.WAIT_FOR_ANSILLA)
@@ -521,6 +560,10 @@ class Scheduler:
         """
         for inst in inst_list:
             if isinstance(inst, instruction):
+                if inst.get_type() == Instype.BARRIER:
+                    process_id = inst.get_processID()
+                    print(f"P{process_id}(t={inst_time}): BARRIER")
+                    continue
                 process_id = inst.get_processID()
                 inst_name = get_gate_type_name(inst.get_type())
                 inst_time = inst.get_scheduled_time()
@@ -602,6 +645,10 @@ class Scheduler:
         for inst in inst_list:
             if isinstance(inst, instruction):
                 process_id = inst.get_processID()
+                if inst.get_type() == Instype.BARRIER:
+                    qiskit_circuit.barrier(label=f"P{process_id} barrier")
+                    continue
+
                 addresses = inst.get_qubitaddress()
                 mapped_addresses = [
                     f"{inst.get_scheduled_mapped_address(addr)} ({addr})"
@@ -626,6 +673,7 @@ class Scheduler:
                     case Instype.MEASURE:
                         qiskit_circuit.measure(inst.get_scheduled_mapped_address(addresses[0]), current_measurement)
                         current_measurement += 1
+                        
                  
         # fig = circuit_drawer(qiskit_circuit, output="mpl", fold=-1) 
         # fig.savefig("my_circuit.png", dpi=300, bbox_inches="tight")
