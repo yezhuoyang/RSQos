@@ -66,7 +66,7 @@ class virtualSpace:
         """
         Allocate a range of virtual addresses in the virtual space.
         """
-        if 0 <= begin_index < end_index <= self._size:
+        if 0 <= begin_index <= end_index <= self._size:
             for i in range(begin_index, end_index+1):
                 self._is_allocated[i] = True
         else:
@@ -76,7 +76,7 @@ class virtualSpace:
         """
         Free a range of virtual addresses in the virtual space.
         """
-        if 0 <= begin_index < end_index <= self._size:
+        if 0 <= begin_index <= end_index <= self._size:
             for i in range(begin_index, end_index+1):
                 self._is_allocated[i] = False
         else:

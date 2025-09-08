@@ -399,16 +399,16 @@ class process:
         return qiskit_circuit
 
 
-    def simulate_circuit(self):
+    def simulate_circuit(self,shots=1000):
         # Choose simulator and transpile for it
         sim = AerSimulator()
         tqc = transpile(self._qiskit_circuit, sim)
 
         # Run with 1000 shots
-        result = sim.run(tqc, shots=1000).result()
+        result = sim.run(tqc, shots=shots).result()
         counts = result.get_counts(tqc)
-        print(counts)
-
+        #print(counts)
+        return counts
 
 
 

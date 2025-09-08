@@ -448,11 +448,11 @@ class HardwareManager:
 
 def generate_simples_example_for_test():
     vdata1 = virtualSpace(size=1, label="vdata1")    
-    vdata1.allocate_range(0,1)
+    vdata1.allocate_range(0,0)
     vsyn1 = virtualSpace(size=1, label="vsyn1", is_syndrome=True)
-    vsyn1.allocate_range(0,1)
+    vsyn1.allocate_range(0,0)
     proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
-    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1)],size=2,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)],size=1,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=1,processID=1))  # Allocate 1 syndrome qubit
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0),vsyn1.get_address(0)])
@@ -461,14 +461,15 @@ def generate_simples_example_for_test():
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=1,processID=1))  # Allocate 2 syndrome qubits
 
     vdata2 = virtualSpace(size=1, label="vdata2")    
-    vdata2.allocate_range(0,1)
+    vdata2.allocate_range(0,0)
     vsyn2 = virtualSpace(size=1, label="vsyn2", is_syndrome=True)
-    vsyn2.allocate_range(0,1)
+    vsyn2.allocate_range(0,0)
     proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2)
-    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1)],size=1,processID=2))  # Allocate 2 data qubits
+    proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)],size=1,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=1,processID=2))  # Allocate 1 syndrome qubit
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0),vsyn2.get_address(0)])
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])  # Measure operation    
     proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation        
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)],size=1 ,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=1,processID=2))  # Allocate 2 syndrome qubits
@@ -1485,13 +1486,44 @@ def generate_example_three_procs_40d_40a_with_ancilla_cnots():
 
 
 
+def distribution_fidelity(dist1: dict, dist2: dict) -> float:
+    """
+    Compute fidelity between two distributions based on L1 distance.
+    
+    Args:
+        dist1 (dict): key=str (event), value=int (count)
+        dist2 (dict): key=str (event), value=int (count)
+    
+    Returns:
+        float: fidelity in [0, 1]
+    """
+    # Step 1: normalize distributions
+    total1 = sum(dist1.values())
+    total2 = sum(dist2.values())
+    prob1 = {k: v / total1 for k, v in dist1.items()}
+    prob2 = {k: v / total2 for k, v in dist2.items()}
+    
+    # Step 2: union of keys
+    all_keys = set(prob1.keys()).union(set(prob2.keys()))
+    
+    # Step 3: compute L1 distance
+    l1_distance = sum(abs(prob1.get(k, 0) - prob2.get(k, 0)) for k in all_keys)
+    
+    # Step 4: fidelity = 1 - L1/2
+    fidelity = 1 - l1_distance / 2
+    return fidelity
+
+
+
+
+
 # ========================  MAIN  ========================
 if __name__ == "__main__":
 
 
 
 
-    kernel_instance, virtual_hardware =generate_example_three_procs_40d_40a_with_ancilla_cnots()
+    kernel_instance, virtual_hardware =generate_simples_example_for_test()
     schedule_instance=Scheduler(kernel_instance,virtual_hardware)
     time1, inst_list1=schedule_instance.dynamic_scheduling()
     #time1, inst_list1=schedule_instance.baseline_scheduling()
@@ -1508,8 +1540,8 @@ if __name__ == "__main__":
     print(qc.num_qubits)
 
     # 0) Fake 156-qubit backend (your Pittsburgh layout)
-    fake_ibm_pittsburgh = construct_fake_ibm_pittsburgh()
-    print(f"[backend] num_qubits = {fake_ibm_pittsburgh.num_qubits}")
+    fake_hard_ware = construct_10_qubit_hardware()
+
 
     # 1) Build the abstract (logical) circuit and save as PNG
     # qc = build_dynamic_circuit_15()
@@ -1517,14 +1549,14 @@ if __name__ == "__main__":
 
     # 2) Transpile to hardware; map 15 logical qubits onto a single long row
     #    (contiguous physical qubits minimize SWAPs on your lattice)
-    initial_layout = [i for i in range(156)]  # logical i -> physical i
+    initial_layout = [i for i in range(10)]  # logical i -> physical i
 
 
 
 
     transpiled = transpile(
         qc,
-        backend=fake_ibm_pittsburgh,
+        backend= fake_hard_ware,
         initial_layout=initial_layout,
         optimization_level=3,
     )
@@ -1541,16 +1573,37 @@ if __name__ == "__main__":
 
     process_list = schedule_instance.get_all_processes()
     syndrome_history = schedule_instance.get_syndrome_map_history()
-    plot_process_schedule_on_pittsburgh(
-        coupling_edges=fake_ibm_pittsburgh.coupling_map,
-        syndrome_qubit_history=syndrome_history,
-        process_list=process_list,
-        out_png="hardware_processes.png",
-    )
+    # plot_process_schedule_on_pittsburgh(
+    #     coupling_edges= fake_hard_ware.coupling_map,
+    #     syndrome_qubit_history=syndrome_history,
+    #     process_list=process_list,
+    #     out_png="hardware_processes.png",
+    # )
 
-    # # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
-    # job = fake_ibm_pittsburgh.run(transpiled, shots=2000)
-    # result = job.result()
-    # counts = result.get_counts()
-    # print("\n=== Counts ===")
-    # print(counts)
+    # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
+    job = fake_hard_ware.run(transpiled, shots=2000)
+    result = job.result()
+    counts = result.get_counts()
+    print("\n=== Counts ===")
+    print(counts)
+
+    print(counts["111"])
+
+
+    print(schedule_instance._measure_index_to_process)
+
+    print(schedule_instance._process_measure_index)
+
+
+    final_result=schedule_instance.return_measure_states(counts)
+    print(final_result)
+
+
+    ideal_result=schedule_instance.return_process_ideal_output(shots=2000)
+    print(ideal_result)
+
+
+    fidelity1 = distribution_fidelity(final_result[1], ideal_result[1])
+    fidelity2 = distribution_fidelity(final_result[2], ideal_result[2])
+    print(f"Fidelity for process 1: {fidelity1:.4f}")
+    print(f"Fidelity for process 2: {fidelity2:.4f}")

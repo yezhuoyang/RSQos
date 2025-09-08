@@ -24,7 +24,47 @@ class Scheduler:
         self._num_measurement = 0  # Keep track of the number of measurement instructions executed
 
         self._syndrome_map_history = {}  # Keep track of all syndrome qubits that are used
+        """
+        Store the mapping between the index of measurement instruction to the process ID that generates it.
+        """
+        self._measure_index_to_process = {}  # Map the index of measurement instruction to the process ID that generates it
+        self._process_measure_index = {}  # Map the process ID to the list of measurement instruction indices it generates
 
+
+
+
+    def return_process_ideal_output(self,shots):
+        """
+        For each process, return the ideal output distribution.
+        """
+        all_process_ideal_counts = {}
+        for process_instance in self._kernel.get_processes():
+            process_instance.construct_qiskit_circuit()
+            counts = process_instance.simulate_circuit(shots=shots)
+            process_id = process_instance.get_processID()
+            print(f"\n=== Ideal Counts for Process {process_id} ===")
+            all_process_ideal_counts[process_id] = counts
+        return all_process_ideal_counts
+
+
+    def return_measure_states(self, backend_result_counts):
+        """
+        After simulation/execution on hardware, return the measurement results for each process.
+        """
+        all_process_counts = {}
+        for process_id, measure_indices in self._process_measure_index.items():
+            process_counts = {}
+            for bitstring, count in backend_result_counts.items():
+                # Extract the bits corresponding to the current process's measurements
+                extracted_bits = ''.join(bitstring[idx] for idx in measure_indices)
+                if extracted_bits in process_counts:
+                    process_counts[extracted_bits] += count
+                else:
+                    process_counts[extracted_bits] = count
+            print(f"\n=== Counts for Process {process_id} ===")
+            print(process_counts)
+            all_process_counts[process_id] = process_counts
+        return all_process_counts
 
 
     def get_syndrome_map_history(self):
@@ -193,6 +233,7 @@ class Scheduler:
         num_finish_process = 0
         total_qpu_time = 0
         final_inst_list = []
+
         for process_instance in processes_stack:
             if self.have_enough_resources(process_instance):
                 self.allocate_resources(process_instance)
@@ -233,6 +274,7 @@ class Scheduler:
         """
         Schedule processes for execution where syndrome qubits are dynamically allocated.
         (Each syndrome qubit in the virtual space is allocated on-the-fly)
+        TODO: Optimize the allocation of syndrome qubits, should consider the connectivity of hardware.
         """
         processes_stack = self._kernel.get_processes().copy()
         processes_stack.sort(key=lambda x: x.get_start_time())  # Sort processes by start time
@@ -241,6 +283,7 @@ class Scheduler:
         process_finish_map = {i: False for i in processes_stack}
         total_qpu_time = 0
         final_inst_list = []
+        current_measurement_index = 0
         while num_finish_process < num_process:
             """
             Three steps:
@@ -364,6 +407,12 @@ class Scheduler:
                             if next_inst.is_measurement():
                                 addresses = next_inst.get_qubitaddress()
                                 self._num_measurement += 1
+                                self._measure_index_to_process[ current_measurement_index ] = process_instance.get_processID()
+                                if not process_instance.get_processID() in self._process_measure_index.keys():
+                                    self._process_measure_index[ process_instance.get_processID() ] = [current_measurement_index]
+                                else:
+                                    self._process_measure_index[ process_instance.get_processID() ].append(current_measurement_index)
+                                current_measurement_index += 1
                                 """
                                 If the instruction is a measurement instruction
                                 Free the ansilla qubit used in this instruction
