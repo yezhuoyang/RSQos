@@ -10,6 +10,126 @@ All virtual quantum processes can be compiled to STIM program of qiskit program.
 
 
 
+
+# Initialize a FT quantum process
+
+In FTQOS, the quantum circuit is programmed on a virtual machine. 
+There are two different virtual space, virtual data space and virtual syndrome space. 
+The process use syscall to initialize/deallocate virtual space.
+Following is an example of initialize a process object with a quantum circuit.
+
+
+```python
+
+vdata1 = virtualSpace(size=3, label="vdata1")
+vdata1.allocate_range(0,2)
+vsyn1 = virtualSpace(size=2, label="vsyn1", is_syndrome=True)
+vsyn1.allocate_range(0,1)
+
+proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1) # Initialize quantum process
+
+# System call to create virtual space
+proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3,processID=1))
+proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1)],size=2,processID=1))
+
+# Define circuit on virtual machine
+proc1.add_instruction(Instype.H, [vsyn1.get_address(0)])
+proc1.add_instruction(Instype.CNOT, [vsyn1.get_address(0),vsyn1.get_address(1)])
+proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])
+proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])
+proc1.add_instruction(Instype.CNOT, [vsyn1.get_address(0), vsyn1.get_address(1)])
+proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
+proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])
+
+# System call to deallocate virtual space
+proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))
+proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1)],size=2,processID=1))
+
+```
+
+You can see the ideal(Noiseless) result of running the process by:
+
+
+```python
+proc1.construct_qiskit_circuit()
+shots=2000
+#Return a dictionary of bitstring. 
+counts = process_instance.simulate_circuit(shots=shots)
+print(counts)
+```
+
+
+# Initialize a QKernel with multiple quantum processes
+
+QKernel handle the task of scheduling different quantum processes, map virtual qubits to real hardware qubit, collect and distribution the measurement results.
+For example, you can initialize a quantum kernel with several processes by:
+
+
+```python
+#Define proc1,proc2,proc3 in the previous code
+kernel_instance = Kernel(config={
+    'max_virtual_logical_qubits': 10_000,
+    'max_physical_qubits': 100_000,
+    'max_syndrome_qubits': 10_000
+})
+kernel_instance.add_process(proc1)
+kernel_instance.add_process(proc2)
+kernel_instance.add_process(proc3)
+```
+
+
+
+# Construct quantum hardware with noise model
+
+We use GenericBackendV2 from qiskit to construct fake hardware with layout constraint. 
+
+
+```python
+
+def construct_10_qubit_hardware():
+    NUM_QUBITS = 10
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
+    BASIS = ["cx", "id", "rz", "sx", "x"]  # add more *only* if truly native
+    SINGLE_QUBIT_GATE_LENGTH_NS = 32       # example: 0.222 ns timestep
+    SINGLE_QUBIT_GATE_LENGTH_NS = 88       # example: 0.222 ns timestep
+    READOUT_LENGTH_NS = 2584     # example measurement timestep
+
+    backend = GenericBackendV2(
+        num_qubits=NUM_QUBITS,
+        basis_gates=BASIS,         # optional
+        coupling_map=COUPLING,     # strongly recommended
+        control_flow=True,        # set True if you want dynamic circuits            
+        seed=1234,                 # reproducible auto-generated props
+        noise_info=True            # attach plausible noise/durations
+    )
+
+    return backend    
+```
+
+You can also specify the noise model by:
+
+
+```python
+def build_noise_model(error_rate_1q=0.001, error_rate_2q=0.01, p_reset=0.001, p_meas=0.01):
+    custom_noise_model = NoiseModel()
+    
+    error_reset = pauli_error([('X', p_reset), ('I', 1 - p_reset)])
+    error_meas = pauli_error([('X',p_meas), ('I', 1 - p_meas)])
+
+    custom_noise_model.add_all_qubit_quantum_error(error_reset,"reset")
+
+    custom_noise_model.add_all_qubit_quantum_error(error_meas,"measure")
+    custom_noise_model.add_all_qubit_quantum_error(depolarizing_error(error_rate_1q, 1), ['id','rx','rz','sx','x'])
+
+    # Add a depolarizing error to two-qubit gates on specific qubits
+    custom_noise_model.add_all_qubit_quantum_error(depolarizing_error(error_rate_2q, 2), ['cz','rzz'])
+
+
+    return custom_noise_model
+```
+
+
+
 # How to use
 
 To initialize and run the scheduling of many quantum processes, see the following example:
@@ -131,14 +251,17 @@ The kernel manage all these process, optimize the resource usage.
 - [x] For T-factory syscall, add space requirement.
 - [x] Consider T-factory scheduling in the baseline algorithm.
 - [x] Consider T-factory scheduling in the round robin algorithm. 
-- [X] Construct a smaller fake backend with 10 qubits
-- [ ] Visualize the scheduling on the backend with 10 qubits
-- [X] Separate readout information of multiple processes
-- [X] For each process, get the ideal output distribution
-- [X] Get the ideal output of the transpiled circuit, to test the correctness of scheduling
-- [X] Test and verify the correctness of process output
+- [x] Construct a smaller fake backend with 10 qubits
+- [x] Visualize the scheduling on the backend with 10 qubits
+- [x] Separate readout information of multiple processes
+- [x] For each process, get the ideal output distribution
+- [x] Get the ideal output of the transpiled circuit, to test the correctness of scheduling
+- [x] Test and verify the correctness of process output
+- [ ] Complete and test baseline scheduling(Alg0)
+- [ ] Complete and test scheduling that doesn't share ansilla qubit(Alg1)
 - [ ] Get more accurate estimation on hardware running time
 - [ ] Figure out if parallel control is possible in IBM quantum
 - [ ] Analyze and add a cost function for routing
-- [ ] Routing aware scheduling algorithm
+- [ ] Complete and test Routing aware scheduling algorithm(Alg3)
+- [ ] Create small baseline(With 10 qubits)
 - [ ] Understand the input/output format of IBM cloud by a free small backend
