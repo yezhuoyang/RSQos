@@ -265,3 +265,4 @@ The kernel manage all these process, optimize the resource usage.
 - [ ] Complete and test Routing aware scheduling algorithm(Alg3)
 - [ ] Create small baseline(With 10 qubits)
 - [ ] Understand the input/output format of IBM cloud by a free small backend
+- [ ] Scheduling algorithm with fixed syndrome qubit area
