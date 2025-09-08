@@ -132,9 +132,13 @@ The kernel manage all these process, optimize the resource usage.
 - [x] Consider T-factory scheduling in the baseline algorithm.
 - [x] Consider T-factory scheduling in the round robin algorithm. 
 - [X] Construct a smaller fake backend with 10 qubits
-- [ ] Separate readout information of multiple processes
+- [ ] Visualize the scheduling on the backend with 10 qubits
+- [X] Separate readout information of multiple processes
 - [X] For each process, get the ideal output distribution
-- [ ] Test and verify the correctness of process output
+- [X] Get the ideal output of the transpiled circuit, to test the correctness of scheduling
+- [X] Test and verify the correctness of process output
+- [ ] Get more accurate estimation on hardware running time
+- [ ] Figure out if parallel control is possible in IBM quantum
 - [ ] Analyze and add a cost function for routing
 - [ ] Routing aware scheduling algorithm
 - [ ] Understand the input/output format of IBM cloud by a free small backend
