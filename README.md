@@ -257,7 +257,7 @@ The kernel manage all these process, optimize the resource usage.
 - [x] For each process, get the ideal output distribution
 - [x] Get the ideal output of the transpiled circuit, to test the correctness of scheduling
 - [x] Test and verify the correctness of process output
-- [ ] Complete and test baseline scheduling(Alg0)
+- [x] Complete and test baseline scheduling(Alg0)
 - [ ] Complete and test scheduling that doesn't share ansilla qubit(Alg1)
 - [ ] Get more accurate estimation on hardware running time
 - [ ] Figure out if parallel control is possible in IBM quantum

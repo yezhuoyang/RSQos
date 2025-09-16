@@ -71,6 +71,15 @@ class process:
         
 
 
+    def analyze_syndrome_connectivity(self):
+        """
+        Analyze the connectivity of syndrome qubits in the process.
+        This function count the number of CNOT gates between all syndrome qubits and data qubits.
+        The return value is a dictionary, the key is the data qubit virtual address,the value us the number of CNOT gates.
+        """
+        raise NotImplementedError("This method needs to be implemented for analyzing syndrome qubit cost.")    
+
+
     def set_status(self, status: ProcessStatus):
         self._status = status
 
