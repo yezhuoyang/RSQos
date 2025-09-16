@@ -68,7 +68,7 @@ class process:
         Qiskit circuit representation of the process
         """
         self._qiskit_circuit = None
-        
+        self._connectivity=None
 
 
     def analyze_syndrome_connectivity(self):
@@ -77,7 +77,18 @@ class process:
         This function count the number of CNOT gates between all syndrome qubits and data qubits.
         The return value is a dictionary, the key is the data qubit virtual address,the value us the number of CNOT gates.
         """
-        raise NotImplementedError("This method needs to be implemented for analyzing syndrome qubit cost.")    
+        self._connectivity = {addr: {daddr:0 for daddr in  self._virtual_data_addresses} for addr in self._virtual_syndrome_addresses}
+
+        for inst in self._instruction_list:
+            if isinstance(inst, instruction) and inst.get_type() == Instype.CNOT:
+                qubit_addresses = inst.get_qubitaddress()
+                control, target = qubit_addresses
+                if control.is_syndrome() and not target.is_syndrome():
+                     self._connectivity[control][target] += 1
+                elif target.is_syndrome() and not control.is_syndrome():
+                     self._connectivity[target][control] += 1
+
+        return  self._connectivity
 
 
     def set_status(self, status: ProcessStatus):
@@ -442,7 +453,7 @@ if __name__ == "__main__":
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])  # CNOT operation
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])  # CNOT operation
-
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])  # CNOT operation
     proc1.add_syscall(syscallinst=syscall_magic_state_distillation(address=[vsyn1.get_address(2),vsyn1.get_address(3)],processID=1))  # Magic state distillation
 
     proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation
@@ -450,7 +461,12 @@ if __name__ == "__main__":
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
 
+
+    proc1.analyze_syndrome_connectivity()
+    print(proc1._connectivity)
+
+
     #proc1.construct_qiskit_diagram()
 
-    proc1.construct_qiskit_circuit()
-    proc1.simulate_circuit()
+    #proc1.construct_qiskit_circuit()
+    #proc1.simulate_circuit()
