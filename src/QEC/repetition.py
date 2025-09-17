@@ -5,7 +5,6 @@ from qiskit_aer import AerSimulator
 from qiskit.circuit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 
-
 class RepetitionCode:
     """
     The repetition code that only protect against bit-flip errors.
@@ -72,6 +71,10 @@ class RepetitionCode:
         
         
         return counts
+
+
+    def create_processor(self):
+        pass
 
 
 

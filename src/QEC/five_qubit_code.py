@@ -76,39 +76,37 @@ class FiveQubitCode:
         self._circuit.measure(self._ancillaqubits[2], self._synclbits[2])
         self._circuit.measure(self._ancillaqubits[3], self._synclbits[3])
 
-        #TODO:Check the binary values for the if_test statements, are these conditions consistent with the syndrome measurements bits?
-        with self._circuit.if_test((self._synclbits, 0b0001)):
-            self._circuit.x(self._dataqubits[1])   
-        with self._circuit.if_test((self._synclbits, 0b0010)):
-            self._circuit.z(self._dataqubits[4])   
-        with self._circuit.if_test((self._synclbits, 0b0011)):
-            self._circuit.x(self._dataqubits[2])   
-        with self._circuit.if_test((self._synclbits, 0b0100)):
-            self._circuit.z(self._dataqubits[2])  
-        with self._circuit.if_test((self._synclbits, 0b0101)):
-            self._circuit.z(self._dataqubits[0])
-        with self._circuit.if_test((self._synclbits, 0b0110)):
-            #self._circuit.x(self._dataqubits[3])
-            pass
-        with self._circuit.if_test((self._synclbits, 0b0111)):
-            self._circuit.y(self._dataqubits[2])
-        with self._circuit.if_test((self._synclbits, 0b1000)):
+        # Corrected lookup table (bit-reversed syndromes from standard; 0b0000 implicit: no correction)
+        with self._circuit.if_test((self._synclbits, 0b1000)):  # 0001 → X_0
             self._circuit.x(self._dataqubits[0])
-        with self._circuit.if_test((self._synclbits, 0b1001)):
-            self._circuit.z(self._dataqubits[3])
-        with self._circuit.if_test((self._synclbits, 0b1010)):
+        with self._circuit.if_test((self._synclbits, 0b0001)):  # 1000 → X_1
+            self._circuit.x(self._dataqubits[1])
+        with self._circuit.if_test((self._synclbits, 0b0011)):  # 1100 → X_2
+            self._circuit.x(self._dataqubits[2])
+        with self._circuit.if_test((self._synclbits, 0b0110)):  # 0110 → X_3
+            self._circuit.x(self._dataqubits[3])
+        with self._circuit.if_test((self._synclbits, 0b1100)):  # 0011 → X_4
+            self._circuit.x(self._dataqubits[4])
+        with self._circuit.if_test((self._synclbits, 0b0101)):  # 1010 → Z_0
+            self._circuit.z(self._dataqubits[0])
+        with self._circuit.if_test((self._synclbits, 0b1010)):  # 0101 → Z_1
             self._circuit.z(self._dataqubits[1])
-        with self._circuit.if_test((self._synclbits, 0b1011)):
+        with self._circuit.if_test((self._synclbits, 0b0100)):  # 0010 → Z_2
+            self._circuit.z(self._dataqubits[2])
+        with self._circuit.if_test((self._synclbits, 0b1001)):  # 1001 → Z_3
+            self._circuit.z(self._dataqubits[3])
+        with self._circuit.if_test((self._synclbits, 0b0010)):  # 0100 → Z_4
+            self._circuit.z(self._dataqubits[4])
+        with self._circuit.if_test((self._synclbits, 0b1101)):  # 1011 → Y_0
             self._circuit.y(self._dataqubits[0])
-        with self._circuit.if_test((self._synclbits, 0b1100)):
-            self._circuit.x(self._dataqubits[4])     
-        with self._circuit.if_test((self._synclbits, 0b1101)):
+        with self._circuit.if_test((self._synclbits, 0b1011)):  # 1101 → Y_1
             self._circuit.y(self._dataqubits[1])
-        with self._circuit.if_test((self._synclbits, 0b1110)):
+        with self._circuit.if_test((self._synclbits, 0b0111)):  # 1110 → Y_2
+            self._circuit.y(self._dataqubits[2])
+        with self._circuit.if_test((self._synclbits, 0b1111)):  # 1111 → Y_3
+            self._circuit.y(self._dataqubits[3])
+        with self._circuit.if_test((self._synclbits, 0b1110)):  # 0111 → Y_4
             self._circuit.y(self._dataqubits[4])
-        with self._circuit.if_test((self._synclbits, 0b1111)):
-            self._circuit.y(self._dataqubits[3]) 
-
 
 
     def logical_readout(self,k:int=0):

@@ -272,5 +272,9 @@ if __name__ == '__main__':
     #suf.print_stab()
     #print(suf._Hmatrix)
     suf.compile_syndrome_circuit()
+
+    circuit=suf.get_circuit()
+    print(circuit)
+
     result=suf.run_simulation(1)
     print(result)
