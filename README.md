@@ -258,12 +258,14 @@ The kernel manage all these process, optimize the resource usage.
 - [x] Get the ideal output of the transpiled circuit, to test the correctness of scheduling
 - [x] Test and verify the correctness of process output
 - [x] Complete and test baseline scheduling(Alg0)
-- [ ] Complete and test scheduling that doesn't share ansilla qubit(Alg1)
+- [x] Complete and test scheduling that doesn't share ansilla qubit(Alg1)
 - [ ] Get more accurate estimation on hardware running time
 - [ ] Figure out if parallel control is possible in IBM quantum
-- [ ] Analyze and add a cost function for routing
-- [ ] Complete and test Routing aware scheduling algorithm(Alg3)
-- [ ] Create small baseline(With 10 qubits)
+- [x] Analyze and add a cost function for routing
+- [x] Complete and test Routing aware scheduling algorithm(Alg3)
+- [x] Create small baseline(With 10 qubits)
 - [ ] Understand the input/output format of IBM cloud by a free small backend
 - [ ] Scheduling algorithm with fixed syndrome qubit area
 - [ ] Now a reset is automatically inserted after measurement, optimize it in the future development
+- [ ] Construct process from STIM file
+- [ ] Generate STIM circuit for evalution
