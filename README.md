@@ -269,3 +269,9 @@ The kernel manage all these process, optimize the resource usage.
 - [ ] Now a reset is automatically inserted after measurement, optimize it in the future development
 - [ ] Construct process from STIM file
 - [ ] Generate STIM circuit for evalution
+- [ ] Construct process from QASM file
+- [ ] Generate QASM file from the scheduling
+- [ ] Create a 20 qubits virtual backend
+- [ ] Surface code memory process
+- [ ] 9 qubit code memory process
+- [ ] 5 qubit code memory process
