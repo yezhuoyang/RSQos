@@ -303,7 +303,69 @@ class Scheduler:
         """
         Put processes into a batch. But not sharying resources between processes in the same batch.
         """
-        pass
+        processes_stack = self._kernel.get_processes().copy()
+
+        num_finish_process = 0
+        total_qpu_time = 0
+        final_inst_list = []
+        current_measurement_index = 0 
+        while num_finish_process < len(processes_stack):
+            for process_instance in processes_stack:
+                if process_instance.get_status() == ProcessStatus.FINISHED:
+                    continue
+
+                if process_instance.get_status() == ProcessStatus.WAIT_TO_START:
+                    if self.have_enough_resources(process_instance):
+                        self.allocate_resources(process_instance)
+                        process_instance.set_status(ProcessStatus.RUNNING)
+                    continue
+
+                if process_instance.get_status() == ProcessStatus.RUNNING:
+
+                    inst=process_instance.execute_instruction(total_qpu_time)
+                    if isinstance(inst, instruction):
+                        total_qpu_time += get_clocktime(inst.get_type())
+                    else:
+                        total_qpu_time += get_syscall_time(inst)
+                    addresses = inst.get_qubitaddress() if isinstance(inst, instruction) else inst.get_address()
+                    for addr in addresses:
+                        physical_qid = self._virtual_hardware_mapping.get_physical_qubit(addr)
+                        inst.set_scheduled_mapped_address(addr, physical_qid)
+                    final_inst_list.append(inst)
+
+                    if isinstance(inst, instruction):
+                        if inst.is_measurement():
+                            self._num_measurement += 1
+                            self._measure_index_to_process[ current_measurement_index ] = process_instance.get_processID()
+                            if not process_instance.get_processID() in self._process_measure_index.keys():
+                                self._process_measure_index[ process_instance.get_processID() ] = [current_measurement_index]
+                            else:
+                                self._process_measure_index[ process_instance.get_processID() ].append(current_measurement_index)
+                            current_measurement_index += 1
+
+
+                            for addr in inst.get_qubitaddress():
+                                physical_qid = self._virtual_hardware_mapping.get_physical_qubit(addr)
+                                newReset=instruction(type=Instype.RESET, qubitaddress=[addr], processID=process_instance.get_processID(), time=total_qpu_time)
+                                newReset.set_scheduled_mapped_address(addr, physical_qid)
+                                newReset.set_scheduled_time(total_qpu_time)
+                                final_inst_list.append(newReset)
+
+                if process_instance.is_done():
+                    process_instance.set_status(ProcessStatus.FINISHED)
+                    num_finish_process += 1
+                    #Reset all data qubits to |0> after the process is done
+                    for addr in process_instance.get_virtual_data_addresses():
+                        physical_qid = self._virtual_hardware_mapping.get_physical_qubit(addr)
+                        newReset=instruction(type=Instype.RESET, qubitaddress=[addr], processID=process_instance.get_processID(), time=total_qpu_time)
+                        newReset.set_scheduled_mapped_address(addr, physical_qid)
+                        newReset.set_scheduled_time(total_qpu_time)
+                        final_inst_list.append(newReset)
+                    self.free_resources(process_instance)
+                    newReset=instruction(type=Instype.BARRIER,qubitaddress=None, processID=process_instance.get_processID(), time=total_qpu_time)
+                    final_inst_list.append(newReset)            
+
+        return total_qpu_time,final_inst_list
 
 
 
@@ -315,9 +377,6 @@ class Scheduler:
         of all processes
         """
         processes_stack = self._kernel.get_processes().copy()
-
-        num_process = len(processes_stack)
-        num_finish_process = 0
         total_qpu_time = 0
         final_inst_list = []
         current_measurement_index = 0 
@@ -568,6 +627,15 @@ class Scheduler:
                     process_finish_map[process_instance] = True
         return total_qpu_time, final_inst_list        
 
+
+
+
+
+    def scheduling_not_share_syndrome_qubit(self):
+        """
+        The scheduling algorithm that does not share syndrome qubits between processes.
+        """
+        pass
 
 
 

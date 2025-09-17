@@ -628,7 +628,7 @@ def generate_simples_example_for_test_9():
 
 
 
-def test_scheduling(test_func, baseline=False, consider_connectivity=True):
+def test_scheduling(test_func, baseline=False, consider_connectivity=True, share_syndrome_qubits=True):
 
 
     kernel_instance, virtual_hardware = test_func()
@@ -646,7 +646,10 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True):
         if consider_connectivity:
             time1, inst_list1=schedule_instance.dynamic_scheduling()
         else:
-            time1, inst_list1=schedule_instance.dynamic_scheduling_no_consider_connectivity()
+            if share_syndrome_qubits:
+                time1, inst_list1=schedule_instance.dynamic_scheduling_no_consider_connectivity()
+            else:
+                time1, inst_list1=schedule_instance.scheduling_with_out_sharing_syndrome_qubit()
 
 
     schedule_instance.print_dynamic_instruction_list(inst_list1)
@@ -775,125 +778,109 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True):
 
 
 if __name__ == "__main__":
+    # Collect tests
+    test_list = [
+        generate_simples_example_for_test_1,
+        generate_simples_example_for_test_2,
+        generate_simples_example_for_test_3,
+        generate_simples_example_for_test_4,
+        generate_simples_example_for_test_5,
+        generate_simples_example_for_test_6,
+        generate_simples_example_for_test_7,
+        generate_simples_example_for_test_8,
+        generate_simples_example_for_test_9,
+    ]
 
-    test_list=[]
-    test_list.append(generate_simples_example_for_test_1)
-    test_list.append(generate_simples_example_for_test_2)
-    test_list.append(generate_simples_example_for_test_3)
-    test_list.append(generate_simples_example_for_test_4)
-    test_list.append(generate_simples_example_for_test_5)
-    test_list.append(generate_simples_example_for_test_6)
-    test_list.append(generate_simples_example_for_test_7)
-    test_list.append(generate_simples_example_for_test_8)
-    test_list.append(generate_simples_example_for_test_9)
+    # Define the four scenarios we want to compare
+    scenarios = [
+        ("Baseline",
+         dict(baseline=True)),
 
-    baselineFidelity=[]
-    baselineDepth=[]
-    baselineTime=[]
+        ("Our (consider connectivity)",
+         dict(baseline=False, consider_connectivity=True,  share_syndrome_qubits=True)),
 
+        ("Our (not consider connectivity)",
+         dict(baseline=False, consider_connectivity=False, share_syndrome_qubits=True)),
 
-    no_connectivity_Fidelity=[]
-    no_connectivity_Depth=[]
-    no_connectivity_Time=[]   
+        ("No-share syndrome",
+         dict(baseline=False, consider_connectivity=False, share_syndrome_qubits=False)),
+    ]
+    scenario_names = [name for name, _ in scenarios]
 
+    # Results: metric -> scenario name -> list over tests
+    results = {
+        "fidelity": {name: [] for name in scenario_names},
+        "depth":    {name: [] for name in scenario_names},
+        "time":     {name: [] for name in scenario_names},
+    }
 
-    ourFidelity=[]
-    ourDepth=[]
-    ourTime=[]
-
+    # Run all tests across all scenarios
     for test in test_list:
-        print("======== Baseline scheduling ========")
-        fidelity, depth, time=test_scheduling(test, baseline=True)
-        baselineFidelity.append(fidelity)
-        baselineDepth.append(depth)
-        baselineTime.append(time)
+        for name, kwargs in scenarios:
+            print(f"======== {name} ========")
+            fidelity, depth, runtime = test_scheduling(test, **kwargs)
+            results["fidelity"][name].append(fidelity)
+            results["depth"][name].append(depth)
+            results["time"][name].append(runtime)
 
-        print("======== Our scheduling (consider connectivity) ========")
-        fidelity, depth, time=test_scheduling(test, baseline=False, consider_connectivity=True)
-        ourFidelity.append(fidelity)
-        ourDepth.append(depth)
-        ourTime.append(time)
+    # Common labels
+    labels = [f"Test {i}" for i in range(1, len(test_list) + 1)]
+    x = np.arange(len(labels))
 
+    def plot_bar_metric(metric_key: str, ylabel: str, title: str, outfile: str, ylim_max=None):
+        """Generic grouped bar plot for a metric across scenarios."""
+        n_sc = len(scenario_names)
+        width = 0.8 / n_sc  # total group width ~0.8
+        fig, ax = plt.subplots(figsize=(12, 6))
 
-        print("======== Our scheduling (not consider connectivity) ========")
-        fidelity, depth, time=test_scheduling(test, baseline=False, consider_connectivity=False)
-        no_connectivity_Fidelity.append(fidelity)
-        no_connectivity_Depth.append(depth)
-        no_connectivity_Time.append(time)
+        rects = []
+        for i, name in enumerate(scenario_names):
+            offset = (i - (n_sc - 1) / 2) * width
+            series = results[metric_key][name]
+            rect = ax.bar(x + offset, series, width, label=name)
+            rects.append(rect)
 
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.set_xticks(x, labels)
+        ax.legend()
 
+        # Bar labels
+        for r in rects:
+            ax.bar_label(r, padding=3)
 
-    """
-    Print the result of fidelity in bar plot
-    Compare three algorithms: baseline, our algorithm considering connectivity, our algorithm not considering connectivity
-    Store the plot in resultFidelity.png
-    """
-    labels = ['Test 1', 'Test 2', 'Test 3', 'Test 4', 'Test 5', 'Test 6','Test 7', 'Test 8', 'Test 9']
-    x = np.arange(len(labels))  # the label locations
-    width = 0.25  # the width of the bars
-    fig, ax = plt.subplots(figsize=(12, 6))
-    rects1 = ax.bar(x - width, baselineFidelity, width, label='Baseline', color='red')
-    rects2 = ax.bar(x, ourFidelity, width, label='Our Algorithm (consider connectivity)', color='blue')
-    rects3 = ax.bar(x + width, no_connectivity_Fidelity, width, label='Our Algorithm (not consider connectivity)', color='green')
-    ax.set_ylabel('Fidelity')
-    ax.set_title('Fidelity by different scheduling algorithms')
-    ax.set_xticks(x, labels)
-    ax.legend()
-    ax.bar_label(rects1, padding=3)
-    ax.bar_label(rects2, padding=3)
-    ax.bar_label(rects3, padding=3)
-    fig.tight_layout()
-    plt.ylim(0, 1.1)
-    plt.savefig("result_fidelity.png")
-    plt.close(fig)
+        # Y-limits
+        if ylim_max is not None:
+            ax.set_ylim(0, ylim_max)
+        else:
+            # Auto based on data
+            all_vals = sum((results[metric_key][n] for n in scenario_names), [])
+            if all_vals:
+                ax.set_ylim(0, max(all_vals) * 1.1)
 
+        fig.tight_layout()
+        plt.savefig(outfile)
+        plt.close(fig)
 
-    """
-    Print the result of width in bar plot
-    Compare three algorithms: baseline, our algorithm considering connectivity, our algorithm not considering connectivity
-    Store the plot in resultWidth.png
-    """
-    labels = ['Test 1', 'Test 2', 'Test 3', 'Test 4', 'Test 5', 'Test 6','Test 7', 'Test 8', 'Test 9']
-    x = np.arange(len(labels))  # the label locations
-    width = 0.25  # the width of the bars
-    fig, ax = plt.subplots(figsize=(12, 6))
-    rects1 = ax.bar(x - width, baselineDepth, width, label='Baseline', color='red')
-    rects2 = ax.bar(x, ourDepth, width, label='Our Algorithm (consider connectivity)', color='blue')
-    rects3 = ax.bar(x + width, no_connectivity_Depth, width, label='Our Algorithm (not consider connectivity)', color='green')
-    ax.set_ylabel('Circuit depth')
-    ax.set_title('Circuit depth by different scheduling algorithms')
-    ax.set_xticks(x, labels)
-    ax.legend()
-    ax.bar_label(rects1, padding=3)
-    ax.bar_label(rects2, padding=3)
-    ax.bar_label(rects3, padding=3)
-    fig.tight_layout()
-    plt.ylim(0, max(baselineDepth + ourDepth + no_connectivity_Depth)*1.1)
-    plt.savefig("result_depth.png")
-    plt.close(fig)
+    # Plots (now FOUR series each)
+    plot_bar_metric(
+        metric_key="fidelity",
+        ylabel="Fidelity",
+        title="Fidelity by scheduling algorithm",
+        outfile="result_fidelity.png",
+        ylim_max=1.1,  # fidelity is typically in [0,1]
+    )
 
+    plot_bar_metric(
+        metric_key="depth",
+        ylabel="Circuit depth",
+        title="Circuit depth by scheduling algorithm",
+        outfile="result_depth.png",
+    )
 
-
-    """
-    Print the result of time in bar plot
-    Compare three algorithms: baseline, our algorithm considering connectivity, our algorithm not considering connectivity
-    Store the plot in resultTime.png
-    """
-    labels = ['Test 1', 'Test 2', 'Test 3', 'Test 4', 'Test 5', 'Test 6','Test 7', 'Test 8', 'Test 9']
-    x = np.arange(len(labels))  # the label locations
-    width = 0.25  # the width of the bars
-    fig, ax = plt.subplots(figsize=(12, 6))
-    rects1 = ax.bar(x - width, baselineTime, width, label='Baseline', color='red')
-    rects2 = ax.bar(x, ourTime, width, label='Our Algorithm (consider connectivity)', color='blue')
-    rects3 = ax.bar(x + width, no_connectivity_Time, width, label='Our Algorithm (not consider connectivity)', color='green')
-    ax.set_ylabel('Circuit depth')
-    ax.set_title('Circuit depth by different scheduling algorithms')
-    ax.set_xticks(x, labels)
-    ax.legend()
-    ax.bar_label(rects1, padding=3)
-    ax.bar_label(rects2, padding=3)
-    ax.bar_label(rects3, padding=3)
-    fig.tight_layout()
-    plt.ylim(0, max(baselineTime + ourTime + no_connectivity_Time)*1.1)
-    plt.savefig("result_time.png")
-    plt.close(fig)
+    plot_bar_metric(
+        metric_key="time",
+        ylabel="Runtime (s)",
+        title="Runtime by scheduling algorithm",
+        outfile="result_time.png",
+    )

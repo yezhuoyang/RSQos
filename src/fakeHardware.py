@@ -1818,7 +1818,7 @@ if __name__ == "__main__":
 
     #time1, inst_list1=schedule_instance.dynamic_scheduling()
     #time1, inst_list1=schedule_instance.dynamic_scheduling_no_consider_connectivity()
-    time1, inst_list1=schedule_instance.baseline_scheduling()
+    time1, inst_list1=schedule_instance.scheduling_with_out_sharing_syndrome_qubit()
     schedule_instance.print_dynamic_instruction_list(inst_list1)
     qc=schedule_instance.construct_qiskit_circuit_for_backend(inst_list1)
 
