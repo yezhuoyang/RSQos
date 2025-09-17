@@ -847,7 +847,7 @@ if __name__ == "__main__":
 
         # Bar labels
         for r in rects:
-            ax.bar_label(r, padding=3)
+            ax.bar_label(r, padding=2, fmt="%.3f", fontsize=8)
 
         # Y-limits
         if ylim_max is not None:

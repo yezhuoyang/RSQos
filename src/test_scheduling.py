@@ -217,7 +217,7 @@ def generate_simples_example_for_test_3():
 def test_scheduling():
 
 
-    kernel_instance, virtual_hardware = generate_simples_example_for_test_3()
+    kernel_instance, virtual_hardware = generate_simples_example_for_test_1()
     #kernel_instance, virtual_hardware = generate_example_ppt10_on_10_qubit_device()
 
     schedule_instance = Scheduler(kernel_instance=kernel_instance, hardware_instance=virtual_hardware)
@@ -312,8 +312,6 @@ def test_scheduling():
     idcounts = result.get_counts(tqc)
     print("\n=== Counts(Ideal) ===")
     print(idcounts)
-
-
 
 
 

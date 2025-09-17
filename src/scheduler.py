@@ -589,8 +589,8 @@ class Scheduler:
                                 The state of this process will be changed to WAIT_FOR_ANSILLA
                                 """
                                 for addr in addresses:
+                                    physical_qid = next_inst.get_scheduled_mapped_address(addr)
                                     if process_instance.is_syndrome_qubit(addr):
-                                        physical_qid = next_inst.get_scheduled_mapped_address(addr)
                                         self._used_counter[physical_qid] -= 1
                                         self._current_avalible[physical_qid] = True
                                         self._num_availble += 1
@@ -804,8 +804,8 @@ class Scheduler:
                                 The state of this process will be changed to WAIT_FOR_ANSILLA
                                 """
                                 for addr in addresses:
+                                    physical_qid = next_inst.get_scheduled_mapped_address(addr)
                                     if process_instance.is_syndrome_qubit(addr):
-                                        physical_qid = next_inst.get_scheduled_mapped_address(addr)
                                         self._used_counter[physical_qid] -= 1
                                         self._current_avalible[physical_qid] = True
                                         self._num_availble += 1
