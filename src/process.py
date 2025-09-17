@@ -68,7 +68,12 @@ class process:
         Qiskit circuit representation of the process
         """
         self._qiskit_circuit = None
+        """
+        Connectivity analysis and mapping cost
+        """
         self._connectivity=None
+        self._mapping_cost=None
+
 
 
     def analyze_syndrome_connectivity(self):
@@ -89,6 +94,47 @@ class process:
                      self._connectivity[target][control] += 1
 
         return  self._connectivity
+
+
+    def calc_mapping_cost(self,distance_matrix,num_physical_qubits):
+        """
+        Calculate the mapping cost for all syndrome qubits in the process.
+        The mapping cost is defined as the sum of the distances between the physical qubit mapped to the syndrome qubit and the physical qubits mapped to the data qubits it interacts with.
+        The distance is weighted by the number of CNOT gates between the syndrome qubit and each data qubit.
+        The return value is a dictionary, the key is the syndrome qubit virtual address, the value is another dictionary, whose key is the physical qubit address, and value is the mapping cost.
+        """
+        self._mapping_cost = {addr: {} for addr in self._virtual_syndrome_addresses}
+        for synaddr in self._virtual_syndrome_addresses:
+            for physical_qubit in range(num_physical_qubits):
+                cost = self.mapping_cost(synaddr, physical_qubit, distance_matrix)
+                self._mapping_cost[synaddr][physical_qubit] = cost
+        return self._mapping_cost
+
+
+
+    def mapping_cost(self,synaddr:virtualAddress,selected_qubit: int ,distance_matrix):
+        """
+        Return the cost if we map a syndrome qubit to selected_qubit
+        We assume here that all data qubits have already been mapped to physical qubits
+        """
+        cost = 0
+        for data_addr in self._virtual_data_addresses:
+            physical_data_qubit = self.get_data_qubit_virtual_hardware_mapping(data_addr)
+            num_cnot = self._connectivity[synaddr][data_addr]
+            cost += num_cnot * distance_matrix[selected_qubit][physical_data_qubit]
+        return cost
+
+
+    def ranked_mapping_cost(self,synaddr:virtualAddress, current_avalible:dict[int,bool]):
+        """
+        Return the ranked mapping cost for a given syndrome qubit.
+        """
+        result = sorted(
+                ((addr, cost) for addr, cost in self._mapping_cost[synaddr].items() if current_avalible[addr]), 
+                key=lambda item: item[1]
+                )
+        return result
+
 
 
     def set_status(self, status: ProcessStatus):

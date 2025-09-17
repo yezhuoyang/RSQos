@@ -577,7 +577,7 @@ def generate_example_ppt10_on_10_qubit_device():
 
 
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9]]  # linear chain
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
 
 
     #print(proc2)
@@ -657,8 +657,7 @@ def generate_simples_example_for_test_2():
     proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 2 syndrome qubits
 
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9]]  # linear chain
-
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
 
     #print(proc2)
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
@@ -723,7 +722,7 @@ def generate_simples_example_for_test():
     proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 2 syndrome qubits
 
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9]]  # linear chain
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
 
 
     #print(proc2)
@@ -1818,6 +1817,7 @@ if __name__ == "__main__":
 
 
     #time1, inst_list1=schedule_instance.dynamic_scheduling()
+    #time1, inst_list1=schedule_instance.dynamic_scheduling_no_consider_connectivity()
     time1, inst_list1=schedule_instance.baseline_scheduling()
     schedule_instance.print_dynamic_instruction_list(inst_list1)
     qc=schedule_instance.construct_qiskit_circuit_for_backend(inst_list1)
@@ -1876,13 +1876,13 @@ if __name__ == "__main__":
 
     # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
 
-    job = fake_hard_ware.run(transpiled, shots=2000)
+    job = fake_hard_ware.run(transpiled, shots=5000)
     result = job.result()
     running_time=result.time_taken
 
    
 
-    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.0000, error_rate_2q=0.0000, p_reset=0.0000, p_meas=0.0000))
+    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.01, error_rate_2q=0.05, p_reset=0.01, p_meas=0.01))
     tqc = transpile(transpiled, sim)
     result = sim.run(tqc, shots=2000).result()
     counts = result.get_counts(tqc)
