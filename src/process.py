@@ -23,7 +23,7 @@ class ProcessStatus(Enum):
 
 class process:
 
-    def __init__(self, processID: int , start_time: int, vdataspace: virtualSpace, vsyndromespace: virtualSpace):
+    def __init__(self, processID: int , start_time: int, vdataspace: virtualSpace, vsyndromespace: virtualSpace, shots=1000) -> None:
         self._start_time=start_time
         self._processID = processID
         self._instruction_list = []
@@ -31,6 +31,7 @@ class process:
         self._current_time = start_time
         self._num_measurement = 0
         self._status = ProcessStatus.WAIT_TO_START
+        self._shots = shots
         """
         The virtual data space, and virtual syndrome qubit space allocated to this process by the OS
         """
@@ -74,6 +75,20 @@ class process:
         self._connectivity=None
         self._mapping_cost=None
 
+
+    def analyze_data_qubit_connectivity(self):
+        """
+        TODO: Analyze the connectivity between data qubits in the process.
+        This is used to help setting up the initial mapping of data qubits.
+        """
+        pass
+
+    def calc_data_qubit_mapping_cost(self,distance_matrix,num_physical_qubits):
+        """
+        TODO: Calculate the mapping cost for all data qubits in the process.
+        We will use a greedy algorithm to find a good initial mapping of data qubits.
+        """
+        pass
 
 
     def analyze_syndrome_connectivity(self):
