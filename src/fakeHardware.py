@@ -45,6 +45,119 @@ def get_10_qubit_hardware_coords() -> list[tuple[float, float]]:
     return coords
 
 
+
+def construct_20_qubit_hardware():
+    NUM_QUBITS = 20
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], 
+                [0,5], [1,6], [2,7], [3,8], [4,9],
+                [5,6], [6,7],[7,8],[8,9],
+                [5,10], [6, 11], [7, 12], [8, 13], [9, 14],
+                [10,11],[11,12], [12,13], [13,14], 
+                [10,15], [11,16], [12,17], [13,18], [14,19],
+                [15,16], [16,17], [17,18], [18,19]]  # linear chain
+    BASIS = ["cx", "id", "rz", "sx", "x"]  # add more *only* if truly native
+    SINGLE_QUBIT_GATE_LENGTH_NS = 32       # example: 0.222 ns timestep
+    SINGLE_QUBIT_GATE_LENGTH_NS = 88       # example: 0.222 ns timestep
+    READOUT_LENGTH_NS = 2584     # example measurement timestep
+
+    backend = GenericBackendV2(
+        num_qubits=NUM_QUBITS,
+        basis_gates=BASIS,         # optional
+        coupling_map=COUPLING,     # strongly recommended
+        control_flow=True,        # set True if you want dynamic circuits            
+        seed=1234,                 # reproducible auto-generated props
+        noise_info=True            # attach plausible noise/durations
+    )
+
+    return backend    
+
+
+def get_20_qubit_hardware_coords() -> list[tuple[float, float]]:
+    edge_length = 1
+    coords = [ ]
+    for i in range(20):
+        if i<5:
+            coords.append( (float(i*edge_length), 0.0) )
+        elif i<10:
+            coords.append( (float((i-5)*edge_length), -edge_length))
+        elif i<15:
+            coords.append( (float((i-10)*edge_length), -2*edge_length))
+        else:
+            coords.append( (float((i-15)*edge_length), -3*edge_length))
+    return coords
+
+
+def plot_process_schedule_on_20_qubit_hardware(coupling_edges: list[list[int]],
+                               syndrome_qubit_history: dict[int, list[int]],
+                               process_list: list,
+                               out_png: str = "hardware_mapping.png",
+                               figsize=(12, 4.5)):      # a bit shorter is fine; width stays large
+    coords = get_20_qubit_hardware_coords()
+    cm = CouplingMap(coupling_edges)
+
+    pairs = cm.get_edges()
+    undirected = sorted(set(tuple(sorted((a, b))) for a, b in pairs))
+
+    # Better layout engine than tight_layout for drawings
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+
+    # edges
+    for a, b in undirected:
+        xa, ya = coords[a]; xb, yb = coords[b]
+        ax.plot([xa, xb], [ya, yb], linewidth=1.5, alpha=0.7, color="#20324d")
+
+    # nodes
+    xs = [xy[0] for xy in coords]; ys = [xy[1] for xy in coords]
+    ax.scatter(xs, ys, s=620, color="#0b1e3f", zorder=3)
+
+    # indices
+    for i, (x, y) in enumerate(coords):
+        ax.text(x, y, str(i), ha="center", va="center", fontsize=7, color="white",
+                zorder=4, clip_on=False)  # avoid text clipping
+
+    # process outlines
+    colors = plt.cm.tab10(np.linspace(0, 1, len(process_list)))
+    for proc, color in zip(process_list, colors):
+        vaddress = proc.get_virtual_data_addresses()
+        label_physical_map = {}
+        for vaddr in vaddress:
+            phys = proc.get_data_qubit_virtual_hardware_mapping(vaddr)
+            if phys is not None:
+                label_physical_map[phys] = str(vaddr)
+
+        for phys, label in label_physical_map.items():
+            x, y = coords[phys]
+            ax.scatter([x], [y], s=780, facecolors="none", edgecolors=color,
+                       linewidths=2.6, zorder=5)
+            ax.text(x, y + 0.3, label, ha="center", va="bottom",
+                    fontsize=6, color=color, weight="bold", zorder=6, clip_on=False)
+
+    # syndrome labels
+    for phys in syndrome_qubit_history.keys():
+        x, y = coords[phys]
+        vaddress_list = syndrome_qubit_history[phys]
+        label = ",".join([str(vaddr) for vaddr in vaddress_list[:2]])
+        if len(vaddress_list) > 2:
+            label += ",..."
+        ax.scatter([x], [y], s=780, facecolors="none", edgecolors="orange",
+                   linewidths=2.6, zorder=5)
+        ax.text(x, y + 0.2, label, ha="center", va="bottom",
+                fontsize=6, color="blue", weight="bold", zorder=6, clip_on=False)
+
+    ax.set_aspect("equal", adjustable="datalim")
+
+    # ---- Key fix: add padding around data limits ----
+    pad = 0.75                     # increase if labels still feel tight
+    ax.set_xlim(min(xs) - pad, max(xs) + pad)
+    ax.set_ylim(min(ys) - pad, max(ys) + pad)
+
+    ax.axis("off")
+
+    # Avoid overly tight cropping; keep a little page margin
+    fig.savefig(out_png, dpi=220, bbox_inches="tight", pad_inches=0.3)
+    plt.close(fig)
+
+
 def plot_process_schedule_on_10_qubit_hardware(coupling_edges: list[list[int]],
                                syndrome_qubit_history: dict[int, list[int]],
                                process_list: list,
@@ -593,16 +706,20 @@ def generate_example_ppt10_on_10_qubit_device():
 
 
 def generate_simples_example_for_test_2():
-    vdata1 = virtualSpace(size=3, label="vdata1")    
-    vdata1.allocate_range(0,2)
+    vdata1 = virtualSpace(size=5, label="vdata1")    
+    vdata1.allocate_range(0,4)
     vsyn1 = virtualSpace(size=3, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0,2)
     proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
-    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)],size=3,processID=1))  # Allocate 2 data qubits
+    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)],size=5,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=3,processID=1))  # Allocate 1 syndrome qubit
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.X, [vdata1.get_address(1)])
     proc1.add_instruction(Instype.X, [vdata1.get_address(2)])
+    proc1.add_instruction(Instype.X, [vdata1.get_address(3)])
+    proc1.add_instruction(Instype.X, [vdata1.get_address(4)])
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1),vdata1.get_address(3)])   
+    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0),vdata1.get_address(4)])
     proc1.add_instruction(Instype.X, [vsyn1.get_address(0)])
     proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation    
     proc1.add_instruction(Instype.X, [vsyn1.get_address(1)])
@@ -657,7 +774,13 @@ def generate_simples_example_for_test_2():
     proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 2 syndrome qubits
 
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], 
+                [0,5], [1,6], [2,7], [3,8], [4,9],
+                [5,6], [6,7],[7,8],[8,9],
+                [5,10], [6, 11], [7, 12], [8, 13], [9, 14],
+                [10,11],[11,12], [12,13], [13,14], 
+                [10,15], [11,16], [12,17], [13,18], [14,19],
+                [15,16], [16,17], [17,18], [18,19]]  # linear chain
 
     #print(proc2)
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
@@ -665,7 +788,7 @@ def generate_simples_example_for_test_2():
     kernel_instance.add_process(proc2)
     kernel_instance.add_process(proc3)
 
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001,edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=20, error_rate=0.001,edge_list=COUPLING)
 
     return kernel_instance, virtual_hardware
 
@@ -1817,6 +1940,7 @@ if __name__ == "__main__":
 
 
     time1, inst_list1=schedule_instance.dynamic_scheduling()
+    #time1, inst_list1=schedule_instance.baseline_scheduling()
     #time1, inst_list1=schedule_instance.dynamic_scheduling_no_consider_connectivity()
     #time1, inst_list1=schedule_instance.scheduling_with_out_sharing_syndrome_qubit()
     schedule_instance.print_dynamic_instruction_list(inst_list1)
@@ -1832,7 +1956,7 @@ if __name__ == "__main__":
     # print(qc.num_qubits)
 
     # 0) Fake 156-qubit backend (your Pittsburgh layout)
-    fake_hard_ware = construct_10_qubit_hardware()
+    fake_hard_ware = construct_20_qubit_hardware()
 
 
     # 1) Build the abstract (logical) circuit and save as PNG
@@ -1841,7 +1965,7 @@ if __name__ == "__main__":
 
     # 2) Transpile to hardware; map 15 logical qubits onto a single long row
     #    (contiguous physical qubits minimize SWAPs on your lattice)
-    initial_layout = [i for i in range(10)]  # logical i -> physical i
+    initial_layout = [i for i in range(20)]  # logical i -> physical i
 
 
 
@@ -1864,7 +1988,7 @@ if __name__ == "__main__":
 
     process_list = schedule_instance.get_all_processes()
     syndrome_history = schedule_instance.get_syndrome_map_history()
-    plot_process_schedule_on_10_qubit_hardware(
+    plot_process_schedule_on_20_qubit_hardware(
         coupling_edges= fake_hard_ware.coupling_map,
         syndrome_qubit_history=syndrome_history,
         process_list=process_list,
