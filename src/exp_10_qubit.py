@@ -715,7 +715,7 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
 
    
 
-    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.01, error_rate_2q=0.05, p_reset=0.02, p_meas=0.02))
+    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.00, error_rate_2q=0.00, p_reset=0.00, p_meas=0.00))
     tqc = transpile(transpiled, sim)
     result = sim.run(tqc, shots=2000).result()
     counts = result.get_counts(tqc)
@@ -802,8 +802,8 @@ if __name__ == "__main__":
         ("Our (not consider connectivity)",
          dict(baseline=False, consider_connectivity=False, share_syndrome_qubits=True)),
 
-        ("No-share syndrome",
-         dict(baseline=False, consider_connectivity=False, share_syndrome_qubits=False)),
+        # ("No-share syndrome",
+        #  dict(baseline=False, consider_connectivity=False, share_syndrome_qubits=False)),
     ]
     scenario_names = [name for name, _ in scenarios]
 

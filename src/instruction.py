@@ -182,6 +182,7 @@ class instruction:
         This is the time when the instruction is actually executed in hardware.
         """
         if self._scheduled_time is None:
+            print(self._type)
             raise ValueError("Instruction has not been scheduled yet.")
         return self._scheduled_time
     

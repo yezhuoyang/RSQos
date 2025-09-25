@@ -166,19 +166,25 @@ class Scheduler:
         return None
     
 
+    def least_cost_data_qubit_for_initial_mapping(self, dataaddr:virtualAddress, process_instance: process) -> int:
+        """
+        Based on connectivity, current mapping of data qubits, the virtual data qubit,
+        return the physical qubit that is unused, but has the least cost to map to the virtual data qubit.
+        This is used for greedy initial mapping of data qubits.
+        """
+        sorted_list= process_instance.ranked_data_mapping_cost(dataaddr, self._current_avalible)
+        assert len(sorted_list)>0, "No available qubit found for data qubit mapping."
+        return sorted_list[0][0]
 
 
-
-    def least_cost_unused_qubit(self, synaddr:virtualAddress, process_instance: process) -> int:
+    def least_cost_unused_qubit_for_syn(self, synaddr:virtualAddress, process_instance: process) -> int:
         """
         Based on connectivity, current mapping of data qubits, the virtual syndrome qubit,
         return the physical qubit that is unused, but has the least cost to map to the virtual syndrome qubit.
         """
-        sorted_list= process_instance.ranked_mapping_cost(synaddr, self._current_avalible)
+        sorted_list= process_instance.ranked_syn_mapping_cost(synaddr, self._current_avalible)
         assert len(sorted_list)>0, "No available qubit found for syndrome mapping."
         return sorted_list[0][0]
-
-
 
 
 
@@ -196,23 +202,65 @@ class Scheduler:
         return min_index if min_index is not None else -1
 
 
-    def allocate_data_qubit(self, process_instance: process):
+    def greedy_allocate_data_qubit(self, process_instance: process):
         """
         Allocate data qubits for a process.
         This function is used for dynamic scheduling algorithm.
         Each data qubit must be mapped to different physical qubits.
+
+        We use greedy algorithm to set the initial mapping of data qubits.
+        TODO: Optimize the algorithm, reduce redundant sorting operations.
         """
-        next_free_index_ = self.next_free_index(0)
+
         for addr in process_instance.get_virtual_data_addresses():
             """
             Find the next available index
             Case 1: The address is a data qubit, find the first availble qubit
+
+            Notice that the mapping cost must be updated freshly for each data qubit!
             """
-            self._current_avalible[next_free_index_] = False
-            self._used_counter[next_free_index_] = 1
+            process_instance.calc_data_mapping_cost(self._all_pair_distance, self._hardware.get_qubit_num())
+            free_index_ = self.least_cost_data_qubit_for_initial_mapping(addr, process_instance)
+            self._current_avalible[free_index_] = False
+            self._used_counter[free_index_] = 1
             self._num_availble -= 1
-            process_instance.set_data_qubit_virtual_hardware_mapping(addr, next_free_index_)
-            next_free_index_ = self.next_free_index(next_free_index_ + 1)
+            self._virtual_hardware_mapping.add_mapping(addr, free_index_)
+            process_instance.set_data_qubit_virtual_hardware_mapping(addr, free_index_)
+ 
+
+
+
+
+    def greedy_allocate_syndrome_qubit(self, process_instance: process):
+        """
+        Greedy allocate syndrome qubits for a process.
+        """
+        for addr in process_instance.get_virtual_syndrome_addresses():
+            """
+            Greedy algorithm: Use available qubit until none are available
+            Otherwise, use the syndrome qubit with the lowest usage count.
+
+            There are two cases:
+              1. Free qubits are available, use the one with the least cost
+              2. No free qubits, use the least busy syndrome qubit
+            """
+            if self._num_availble > 0:
+                free_index_ = self.least_cost_unused_qubit_for_syn(addr, process_instance)
+                self._current_avalible[free_index_] = False
+                self._used_counter[free_index_] = 1
+                self._num_availble -= 1
+                self._virtual_hardware_mapping.add_mapping(addr, free_index_)
+                process_instance.set_syndrome_qubit_virtual_hardware_mapping(addr, free_index_) 
+            else:
+                least_busy_qubit = self.least_busy_syndrome_qubit()
+                if least_busy_qubit != -1:
+                    self._used_counter[least_busy_qubit] += 1
+                    self._virtual_hardware_mapping.add_mapping(addr, least_busy_qubit)
+                    self._virtual_hardware_mapping.add_mapping(addr, free_index_)
+                    process_instance.set_syndrome_qubit_virtual_hardware_mapping(addr, least_busy_qubit)
+                else:
+                    assert False, "No available qubit found for syndrome mapping."
+
 
 
     def free_syndrome_qubit(self, process_instance: process):
@@ -244,8 +292,6 @@ class Scheduler:
 
 
 
-
-
     def allocate_resources(self, process_instance: process):
         """
         Allocate resources for a process.(This is used for static mapping)
@@ -253,42 +299,11 @@ class Scheduler:
         Idea: Each data qubit must be mapped to different physical qubits.
               However, syndrome qubits can be reused.
         """
-        next_free_index_=self.next_free_index(0)
-        for addr in process_instance.get_virtual_data_addresses():
-            """
-            Find the next available index
-            Case 1: The address is a data qubit, find the first availble qubit
-            """
-            self._current_avalible[next_free_index_] = False
-            self._used_counter[next_free_index_] = 1
-            self._num_availble -= 1
-            self._virtual_hardware_mapping.add_mapping(addr, next_free_index_)
-            process_instance.set_data_qubit_virtual_hardware_mapping(addr, next_free_index_)
-            next_free_index_=self.next_free_index(next_free_index_+1)
-
-        next_free_index_=self.next_free_index(0)
-        for addr in process_instance.get_virtual_syndrome_addresses():
-            """
-            Greedy algorithm: Use available qubit until none are available
-            Otherwise, use the syndrome qubit with the lowest usage count.
-            """
-            if self._num_availble > 0:
-                self._current_avalible[next_free_index_] = False
-                self._used_counter[next_free_index_] = 1
-                self._num_availble -= 1
-                self._mapped_to_syndrome[next_free_index_] = True
-                self._virtual_hardware_mapping.add_mapping(addr, next_free_index_)
-                process_instance.set_syndrome_qubit_virtual_hardware_mapping(addr, next_free_index_)
-                next_free_index_ = self.next_free_index(next_free_index_ + 1)
-            else:
-                least_busy_qubit = self.least_busy_syndrome_qubit()
-                if least_busy_qubit != -1:
-                    self._used_counter[least_busy_qubit] += 1
-                    self._virtual_hardware_mapping.add_mapping(addr, least_busy_qubit)
-                    process_instance.set_syndrome_qubit_virtual_hardware_mapping(addr, least_busy_qubit)
-                else:
-                    assert False, "No available qubit found for syndrome mapping."
-
+        process_instance.analyze_data_qubit_connectivity()
+        self.greedy_allocate_data_qubit(process_instance)
+        process_instance.analyze_syndrome_connectivity()
+        process_instance.calc_syn_mapping_cost(self._all_pair_distance, self._hardware.get_qubit_num())
+        self.greedy_allocate_syndrome_qubit(process_instance)
 
 
     def advanced_scheduling(self):
@@ -309,12 +324,19 @@ class Scheduler:
         total_qpu_time = 0
         final_inst_list = []
         current_measurement_index = 0 
+
+        """
+        Analysis and calculate the connectivity and mapping cost for each process.
+        """
+        self.calculate_all_pair_distance()
+
         while num_finish_process < len(processes_stack):
             for process_instance in processes_stack:
                 if process_instance.get_status() == ProcessStatus.FINISHED:
                     continue
 
                 if process_instance.get_status() == ProcessStatus.WAIT_TO_START:
+                    process_instance.analyze_data_qubit_connectivity()
                     if self.have_enough_resources(process_instance):
                         self.allocate_resources(process_instance)
                         process_instance.set_status(ProcessStatus.RUNNING)
@@ -380,6 +402,12 @@ class Scheduler:
         total_qpu_time = 0
         final_inst_list = []
         current_measurement_index = 0 
+
+        """
+        Analysis and calcualte the connectivity and mapping cost for each process.
+        """
+        self.calculate_all_pair_distance()
+
         for process_instance in processes_stack:
             if self.have_enough_resources(process_instance):
                 self.allocate_resources(process_instance)
@@ -466,8 +494,9 @@ class Scheduler:
             """
             for process_instance in processes_stack:
                 if process_instance.get_status() == ProcessStatus.WAIT_TO_START:
+                    process_instance.analyze_data_qubit_connectivity()
                     if self.have_enough_resources(process_instance):
-                        self.allocate_data_qubit(process_instance)
+                        self.greedy_allocate_data_qubit(process_instance)
                         process_instance.set_status(ProcessStatus.WAIT_FOR_ANSILLA)
             """
             Collect all the instructions that are waiting for syndrome qubit
@@ -675,13 +704,18 @@ class Scheduler:
             for process_instance in processes_stack:
                 if process_instance.get_status() == ProcessStatus.WAIT_TO_START:
                     if self.have_enough_resources(process_instance):
-                        self.allocate_data_qubit(process_instance)
+                        """
+                        First, analyze the connectivity within data qubits for greedy initial mapping.
+                        """
+                        process_instance.analyze_data_qubit_connectivity()
+                        process_instance.calc_data_mapping_cost(self._all_pair_distance, self._hardware.get_qubit_num())
+                        self.greedy_allocate_data_qubit(process_instance)
                         process_instance.set_status(ProcessStatus.WAIT_FOR_ANSILLA)
                         """
                         Once the data qubits are allocated, we can analyze the connectivity and mapping cost for this process.
                         """
                         process_instance.analyze_syndrome_connectivity()
-                        process_instance.calc_mapping_cost(self._all_pair_distance, self._hardware.get_qubit_num())
+                        process_instance.calc_syn_mapping_cost(self._all_pair_distance, self._hardware.get_qubit_num())
 
             """
             Collect all the instructions that are waiting for syndrome qubit
@@ -720,7 +754,7 @@ class Scheduler:
                         #next_free_index_ = self.next_free_index(0)
                         for addr in addresses:
                             if process_instance.is_syndrome_qubit(addr) and not process_instance.syndrome_qubit_is_allocated(addr):
-                                best_free_index = self.least_cost_unused_qubit(addr, process_instance)
+                                best_free_index = self.least_cost_unused_qubit_for_syn(addr, process_instance)
                                 self._current_avalible[best_free_index] = False
                                 if not best_free_index in self._syndrome_map_history.keys():
                                     self._syndrome_map_history[best_free_index] = [addr]
@@ -1070,7 +1104,7 @@ class Scheduler:
                         qiskit_circuit.append(HGate(label=f"H(P{process_id})"),[inst.get_scheduled_mapped_address(addresses[0])])
                         #qiskit_circuit.h(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")
                     case Instype.RESET:
-                        qiskit_circuit.reset(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}") 
+                        qiskit_circuit.reset(inst.get_scheduled_mapped_address(addresses[0])) 
                     case Instype.MEASURE:
                         qiskit_circuit.measure(inst.get_scheduled_mapped_address(addresses[0]), current_measurement)
                         qiskit_circuit.barrier(label=f"P{process_id} measure, t={inst_time}")
@@ -1128,7 +1162,7 @@ def simple_example_with_T_gate():
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
 
-    proc1.construct_qiskit_diagram()
+    #proc1.construct_qiskit_diagram()
 
     vdata2 = virtualSpace(size=10, label="vdata2")
     vdata2.allocate_range(0,2)
@@ -1147,7 +1181,7 @@ def simple_example_with_T_gate():
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0),vdata2.get_address(1),vdata2.get_address(2)],size=3 ,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1),vsyn2.get_address(2)],size=3,processID=2))  # Allocate 2 syndrome qubits
 
-    proc2.construct_qiskit_diagram()
+    #proc2.construct_qiskit_diagram()
 
     #print(proc2)
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
@@ -1178,7 +1212,7 @@ def generate_example_ppt():
     proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])  # Measure operation
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1)],size=2,processID=1))  # Allocate 2 syndrome qubits
-    proc1.construct_qiskit_diagram()
+    #proc1.construct_qiskit_diagram()
 
 
     vdata2 = virtualSpace(size=3, label="vdata2")
@@ -1199,15 +1233,15 @@ def generate_example_ppt():
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0),vsyn2.get_address(1)],size=2,processID=2))  # Allocate 2 syndrome qubits
 
 
-    proc2.construct_qiskit_diagram()
+    #proc2.construct_qiskit_diagram()
 
-
+    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
     #print(proc2)
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
 
-    virtual_hardware = virtualHardware(qubit_number=7, error_rate=0.001)
+    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001, edge_list=COUPLING)
 
     return kernel_instance, virtual_hardware
 
@@ -1519,12 +1553,12 @@ if __name__ == "__main__":
 
     kernel_instance, virtual_hardware = generate_example_ppt()
     schedule_instance=Scheduler(kernel_instance,virtual_hardware)
-    time1, inst_list1=schedule_instance.dynamic_scheduling()
+    time1, inst_list1=schedule_instance.scheduling_with_out_sharing_syndrome_qubit()
     #time1, inst_list1=schedule_instance.baseline_scheduling()
     schedule_instance.print_dynamic_instruction_list(inst_list1)
 
 
-    schedule_instance.construct_qiskit_from_instruction_list(inst_list1)
+    #schedule_instance.construct_qiskit_from_instruction_list(inst_list1)
 
     print("-------------------------------------------------------------")
 
