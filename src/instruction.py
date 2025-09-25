@@ -112,6 +112,11 @@ class instruction:
         self._processID=processID
 
 
+    def reset_mapping(self):
+        self._scheduled_mapped_address={} # This is the physical address after scheduling
+        self._scheduled_time=None  # This is the real time an instruction is performed in hardware after scheduling
+
+
     def is_reset(self) -> bool:
         """
         Check if the instruction is a reset operation.

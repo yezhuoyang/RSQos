@@ -1,3 +1,4 @@
+from typing import Union
 from kernel import *
 from process import *
 from instruction import *
@@ -39,6 +40,35 @@ def all_pairs_distances(n, edges):
     return dist
 
 
+"""
+The real hardware job that is sent to hardware.
+The output of the scheduler is a set of HardwareJobs.
+
+For example, if a kernel has 3 processes. 
+P1:1000 shots, P2:2000 shots, P3:3000 shots
+
+Then, the scheduler will generate 2 HardwareJobs:
+
+Job1: [P1, P2, P3], 1000 shots
+Job2: [P2, P3, P3], 1000 shots
+
+Note that in one HardwareJob, all processes must have the same number of shots, but one
+processes can appear many times
+"""
+class HardwareJob:
+    def __init__(self, instruction_list: List[Union[instruction, syscall]], total_shot: int):
+        self._instruction_list = instruction_list
+        self._total_shot = total_shot
+
+
+    def get_instruction_list(self) -> List[Union[instruction, syscall]]:
+        return self._instruction_list
+
+
+    def calc_result(self):
+        pass
+
+
 
 
 
@@ -67,6 +97,12 @@ class Scheduler:
         Store the distance between every pair of qubits on the hardware.
         """
         self._all_pair_distance = None
+
+
+
+
+    def group_processes(self):
+        pass
 
 
 

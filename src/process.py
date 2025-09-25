@@ -33,6 +33,10 @@ class process:
         self._status = ProcessStatus.WAIT_TO_START
         self._shots = shots
         """
+        Keep track of the remaining shots to be executed.
+        """
+        self._remaining_shots = shots  
+        """
         The virtual data space, and virtual syndrome qubit space allocated to this process by the OS
         """
         self._vdataspace = vdataspace
@@ -81,6 +85,27 @@ class process:
         self._data_qubit_inner_connectivity=None
         self._data_mapping_cost=None
         
+
+
+    def reset_mapping(self):
+        """
+        Reset all mappings in the process.
+        But notice that the remaining shots and consumed QPU time are not reset.
+        """
+        self._status = ProcessStatus.WAIT_TO_START
+        self._executed = {}
+        self._is_done = False
+        self._next_instruction_label = 0
+        self._consumed_qpu_time = 0
+        self._data_qubit_virtual_hardware_mapping = {}  # type: dict[virtualAddress, int]
+        self._syndrome_qubit_virtual_hardware_mapping = {}  # type: dict[virtualAddress, int]
+        self._syndrome_qubit_is_allocated = {}  # type: dict[virtualAddress, bool]
+        for inst in self._instruction_list:
+            if isinstance(inst, instruction):
+                inst.reset_mapping()
+
+
+
 
     def analyze_data_qubit_connectivity(self):
         """
