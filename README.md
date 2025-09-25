@@ -271,7 +271,11 @@ The kernel manage all these process, optimize the resource usage.
 - [ ] Generate STIM circuit for evalution
 - [ ] Construct process from QASM file
 - [ ] Generate QASM file from the scheduling
-- [ ] Create a 20 qubits virtual backend
+- [X] Create a 20 qubits virtual backend
 - [ ] Surface code memory process
 - [ ] 9 qubit code memory process
 - [ ] 5 qubit code memory process
+- [ ] Virtual Classical memory
+- [ ] Add instruction class correspond to if_test dynamic statement in Qiskit
+- [ ] HardwareJob abstraction
+- [ ] Support scheduling Process with different Shots
