@@ -86,6 +86,21 @@ class process:
         self._data_mapping_cost=None
         
 
+    def get_total_shots(self):
+        return self._shots
+
+
+    def finish_shot(self):
+        return self._remaining_shots == 0
+
+
+    def consume_shot(self, shot_num: int):
+        self._remaining_shots -= int(shot_num)
+
+
+    def get_remaining_shots(self) -> int:
+        return self._remaining_shots
+
 
     def reset_mapping(self):
         """

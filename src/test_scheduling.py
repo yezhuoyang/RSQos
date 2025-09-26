@@ -323,7 +323,7 @@ def test_scheduling():
     #print(final_result)
 
 
-    ideal_result=schedule_instance.return_process_ideal_output(shots=2000)
+    ideal_result=schedule_instance.return_process_ideal_output()
     #print(ideal_result)
 
 

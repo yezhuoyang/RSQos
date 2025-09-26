@@ -56,8 +56,9 @@ Note that in one HardwareJob, all processes must have the same number of shots, 
 processes can appear many times
 """
 class HardwareJob:
-    def __init__(self, instruction_list: List[Union[instruction, syscall]], total_shot: int):
+    def __init__(self, instruction_list: List[Union[instruction, syscall]], total_time: int, total_shot: int):
         self._instruction_list = instruction_list
+        self._total_time = total_time
         self._total_shot = total_shot
 
 
@@ -100,12 +101,6 @@ class Scheduler:
 
 
 
-
-    def group_processes(self):
-        pass
-
-
-
     def calculate_all_pair_distance(self):
         """
         Calculate the distance between every pair of qubits on the hardware.
@@ -117,14 +112,14 @@ class Scheduler:
 
 
 
-    def return_process_ideal_output(self,shots):
+    def return_process_ideal_output(self):
         """
         For each process, return the ideal output distribution.
         """
         all_process_ideal_counts = {}
         for process_instance in self._kernel.get_processes():
             process_instance.construct_qiskit_circuit()
-            counts = process_instance.simulate_circuit(shots=shots)
+            counts = process_instance.simulate_circuit(shots=process_instance.get_total_shots())
             process_id = process_instance.get_processID()
             all_process_ideal_counts[process_id] = counts
         return all_process_ideal_counts

@@ -25,6 +25,35 @@ class Kernel:
         else:
             raise TypeError("Expected a process instance.")
 
+
+    def processes_all_finished(self):
+        """
+        Check if all processes have finished execution.
+        Specifically, here we mean all shots of all processes have been executed.
+        """
+        for proc in self._processes:
+            if not proc.finish_shot():
+                return False
+        return True
+
+
+    def get_next_process_batch(self):
+        """
+        Get the next batch of processes to execute.
+        In each batch, all procesces consume the same number of shots. 
+        TODO: Further optimize the batch selection strategy.
+        """
+        proc_batch = []
+        final_shot_num = 0
+        proc_shot_dict = {proc: proc.get_remaining_shots() for proc in self._processes if not proc.finish_shot()}
+        min_shot_num = min(proc_shot_dict.values())
+        for proc in self._processes:
+            if not proc.finish_shot():
+                proc.consume_shot(min_shot_num)
+                proc_batch.append(proc)
+        return proc_batch, min_shot_num
+
+
     def get_processes(self):
         return self._processes
 
