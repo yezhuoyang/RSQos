@@ -91,6 +91,9 @@ class process:
 
 
     def finish_shot(self):
+        """
+        Return true if all the shots of this process has been consumed
+        """
         return self._remaining_shots == 0
 
 

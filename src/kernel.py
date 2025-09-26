@@ -15,6 +15,29 @@ class Kernel:
         self._max_physical_qubits = config.get('max_physical_qubits', 10000)
         self._max_syndrome_qubits = config.get('max_syndrome_qubits', 1000)
         self._processes = []
+        self._process_result_count = {}
+
+
+
+    def update_process_results(self,process_counts_results: dict):
+        """
+        Update the results of processes after execution.
+        process_counts_results: A dictionary mapping process IDs to their measurement results.
+        For example: {1: {'00': 512, '11': 512}, 2: {'0': 700, '1': 324}}
+        """
+        for processID, counts_dict in process_counts_results.items():
+            if processID in self._process_result_count:
+                for count_key, count_value in counts_dict.items():
+                    if count_key in self._process_result_count[processID]:
+                        self._process_result_count[processID][count_key] += count_value
+                    else:
+                        self._process_result_count[processID][count_key] = count_value
+            else:
+                raise ValueError(f"Process ID {processID} not found in kernel.")
+
+        print("Updated process results:")
+        print(self._process_result_count)
+
 
     def add_process(self, process_instance: process):
         """
@@ -22,6 +45,7 @@ class Kernel:
         """
         if isinstance(process_instance, process):
             self._processes.append(process_instance)
+            self._process_result_count[process_instance.get_processID()] = {}
         else:
             raise TypeError("Expected a process instance.")
 

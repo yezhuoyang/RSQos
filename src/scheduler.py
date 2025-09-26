@@ -128,6 +128,8 @@ class Scheduler:
     def return_measure_states(self, backend_result_counts):
         """
         After simulation/execution on hardware, return the measurement results for each process.
+        This is the key interface, which convert the real hardware result
+        back to the result of each process.
         """
         all_process_counts = {}
         

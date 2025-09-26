@@ -54,7 +54,7 @@ def construct_20_qubit_hardware():
                 [5,10], [6, 11], [7, 12], [8, 13], [9, 14],
                 [10,11],[11,12], [12,13], [13,14], 
                 [10,15], [11,16], [12,17], [13,18], [14,19],
-                [15,16], [16,17], [17,18], [18,19]]  # linear chain
+                [15,16], [16,17], [17,18], [18,19]]  
     BASIS = ["cx", "id", "rz", "sx", "x"]  # add more *only* if truly native
     SINGLE_QUBIT_GATE_LENGTH_NS = 32       # example: 0.222 ns timestep
     SINGLE_QUBIT_GATE_LENGTH_NS = 88       # example: 0.222 ns timestep
@@ -2036,7 +2036,12 @@ if __name__ == "__main__":
 
 
     final_result=schedule_instance.return_measure_states(counts)
-    #print(final_result)
+    print("Final result from fake hardware:")
+    print(final_result)
+
+
+    kernel_instance.update_process_results(final_result)
+
 
 
     ideal_result=schedule_instance.return_process_ideal_output()
