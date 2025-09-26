@@ -19,6 +19,7 @@ class Kernel:
 
 
 
+
     def update_process_results(self,process_counts_results: dict):
         """
         Update the results of processes after execution.
@@ -35,8 +36,6 @@ class Kernel:
             else:
                 raise ValueError(f"Process ID {processID} not found in kernel.")
 
-        print("Updated process results:")
-        print(self._process_result_count)
 
 
     def add_process(self, process_instance: process):
@@ -59,6 +58,12 @@ class Kernel:
             if not proc.finish_shot():
                 return False
         return True
+
+
+    def reset_all_processes(self):
+        for proc in self._processes:
+            proc.reset_mapping()
+
 
 
     def get_next_process_batch(self):

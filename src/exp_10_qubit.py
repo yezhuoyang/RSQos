@@ -20,7 +20,7 @@ def generate_simples_example_for_test_1():
     vdata1.allocate_range(0,0)
     vsyn1 = virtualSpace(size=1, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0,0)
-    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1, shots=899)
     proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)],size=1,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=1,processID=1))  # Allocate 1 syndrome qubit
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
@@ -40,7 +40,7 @@ def generate_simples_example_for_test_1():
     vdata2.allocate_range(0,0)
     vsyn2 = virtualSpace(size=1, label="vsyn2", is_syndrome=True)
     vsyn2.allocate_range(0,0)
-    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2, shots=451)
     proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)],size=1,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=1,processID=2))  # Allocate 1 syndrome qubit
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
@@ -73,7 +73,7 @@ def generate_simples_example_for_test_2():
     vdata1.allocate_range(0,2)
     vsyn1 = virtualSpace(size=3, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0,2)
-    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1,shots=1500)
     proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)],size=3,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=3,processID=1))  # Allocate 1 syndrome qubit
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
@@ -99,7 +99,7 @@ def generate_simples_example_for_test_2():
     vdata2.allocate_range(0,2)
     vsyn2 = virtualSpace(size=3, label="vsyn2", is_syndrome=True)
     vsyn2.allocate_range(0,2)
-    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2, shots=1000)
     proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)],size=3,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=3,processID=2))  # Allocate 1 syndrome qubit
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
@@ -122,7 +122,7 @@ def generate_simples_example_for_test_2():
     vdata3.allocate_range(0,0)
     vsyn3 = virtualSpace(size=1, label="vsyn3", is_syndrome=True)
     vsyn3.allocate_range(0,0)
-    proc3 = process(processID=3, start_time=0, vdataspace=vdata3, vsyndromespace=vsyn3)
+    proc3 = process(processID=3, start_time=0, vdataspace=vdata3, vsyndromespace=vsyn3,shots=1200)
     proc3.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata3.get_address(0)],size=1,processID=3))  # Allocate 2 data qubits
     proc3.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 1 syndrome qubit
     proc3.add_instruction(Instype.X, [vdata3.get_address(0)])
@@ -158,7 +158,7 @@ def generate_simples_example_for_test_3():
     vdata1.allocate_range(0,2)
     vsyn1 = virtualSpace(size=3, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0,2)
-    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1, shots=1000)
     proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)],size=3,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=3,processID=1))  # Allocate 1 syndrome qubit
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
@@ -184,7 +184,7 @@ def generate_simples_example_for_test_3():
     vdata2.allocate_range(0,2)
     vsyn2 = virtualSpace(size=3, label="vsyn2", is_syndrome=True)
     vsyn2.allocate_range(0,2)
-    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2 = process(processID=2, start_time=0, vdataspace=vdata2, vsyndromespace=vsyn2, shots=1880)
     proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)],size=3,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=3,processID=2))  # Allocate 1 syndrome qubit
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
@@ -221,7 +221,7 @@ def generate_simples_example_for_test_4():
     vdata1.allocate_range(0, 1)
     vsyn1 = virtualSpace(size=1, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0, 0)
-    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1, shots=1709)
     proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)], size=2, processID=1))
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=1, processID=1))
     # Entangle data[0] and data[1] sequentially with the same syndrome
@@ -239,7 +239,7 @@ def generate_simples_example_for_test_4():
     vdata2.allocate_range(0, 0)
     vsyn2 = virtualSpace(size=1, label="vsyn2", is_syndrome=True)
     vsyn2.allocate_range(0, 0)
-    proc2 = process(processID=2, start_time=5, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2 = process(processID=2, start_time=5, vdataspace=vdata2, vsyndromespace=vsyn2, shots=1590)
     proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)], size=1, processID=2))
     proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
@@ -265,7 +265,7 @@ def generate_simples_example_for_test_5():
     vdata1.allocate_range(0, 2)
     vsyn1 = virtualSpace(size=1, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0, 0)
-    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1, shots=1520)
     proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)], size=3, processID=1))
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=1, processID=1))
     # Parity of three data qubits onto one syndrome, with some single-qubit dressing
@@ -285,7 +285,7 @@ def generate_simples_example_for_test_5():
     vdata2.allocate_range(0, 1)
     vsyn2 = virtualSpace(size=2, label="vsyn2", is_syndrome=True)
     vsyn2.allocate_range(0, 1)
-    proc2 = process(processID=2, start_time=2, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2 = process(processID=2, start_time=2, vdataspace=vdata2, vsyndromespace=vsyn2, shots=1962)
     proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)], size=2, processID=2))
     proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=2, processID=2))
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
@@ -303,7 +303,7 @@ def generate_simples_example_for_test_5():
     vdata3.allocate_range(0, 0)
     vsyn3 = virtualSpace(size=1, label="vsyn3", is_syndrome=True)
     vsyn3.allocate_range(0, 0)
-    proc3 = process(processID=3, start_time=4, vdataspace=vdata3, vsyndromespace=vsyn3)
+    proc3 = process(processID=3, start_time=4, vdataspace=vdata3, vsyndromespace=vsyn3, shots=1233)
     proc3.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata3.get_address(0)], size=1, processID=3))
     proc3.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn3.get_address(0)], size=1, processID=3))
     proc3.add_instruction(Instype.H, [vdata3.get_address(0)])
@@ -330,7 +330,7 @@ def generate_simples_example_for_test_6():
     vdata1.allocate_range(0, 0)
     vsyn1 = virtualSpace(size=2, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0, 1)
-    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    proc1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1, shots=2000)
     proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)], size=1, processID=1))
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=2, processID=1))
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
@@ -348,7 +348,7 @@ def generate_simples_example_for_test_6():
     vdata2.allocate_range(0, 1)
     vsyn2 = virtualSpace(size=1, label="vsyn2", is_syndrome=True)
     vsyn2.allocate_range(0, 0)
-    proc2 = process(processID=2, start_time=1, vdataspace=vdata2, vsyndromespace=vsyn2)
+    proc2 = process(processID=2, start_time=1, vdataspace=vdata2, vsyndromespace=vsyn2, shots=500)
     proc2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)], size=2, processID=2))
     proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
     proc2.add_instruction(Instype.H, [vdata2.get_address(0)])
@@ -383,7 +383,7 @@ def generate_simples_example_for_test_7():
     vdata1.allocate_range(0, 2)
     vsyn1 = virtualSpace(size=1, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0, 0)
-    p1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    p1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1, shots=1500)
     p1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)], size=3, processID=1))
     p1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=1, processID=1))
 
@@ -418,7 +418,7 @@ def generate_simples_example_for_test_7():
     vdata2.allocate_range(0, 1)
     vsyn2 = virtualSpace(size=1, label="vsyn2", is_syndrome=True)
     vsyn2.allocate_range(0, 0)
-    p2 = process(processID=2, start_time=3, vdataspace=vdata2, vsyndromespace=vsyn2)
+    p2 = process(processID=2, start_time=3, vdataspace=vdata2, vsyndromespace=vsyn2, shots=3000)
     p2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)], size=2, processID=2))
     p2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
 
@@ -459,7 +459,7 @@ def generate_simples_example_for_test_8():
     vdata1.allocate_range(0, 1)
     vsyn1 = virtualSpace(size=2, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0, 1)
-    p1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    p1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1, shots=3240)
     p1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)], size=2, processID=1))
     p1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=2, processID=1))
 
@@ -491,7 +491,7 @@ def generate_simples_example_for_test_8():
     vdata2.allocate_range(0, 2)
     vsyn2 = virtualSpace(size=1, label="vsyn2", is_syndrome=True)
     vsyn2.allocate_range(0, 0)
-    p2 = process(processID=2, start_time=4, vdataspace=vdata2, vsyndromespace=vsyn2)
+    p2 = process(processID=2, start_time=4, vdataspace=vdata2, vsyndromespace=vsyn2, shots=2310)
     p2.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata2.get_address(0)], size=3, processID=2))
     p2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
 
@@ -535,7 +535,7 @@ def generate_simples_example_for_test_9():
     vdata1.allocate_range(0, 0)
     vsyn1 = virtualSpace(size=3, label="vsyn1", is_syndrome=True)
     vsyn1.allocate_range(0, 2)
-    p1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
+    p1 = process(processID=1, start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1, shots=2222)
     p1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0)], size=1, processID=1))
     p1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=3, processID=1))
 
@@ -639,89 +639,94 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
 
     dis=schedule_instance.calculate_all_pair_distance()
 
-
-    if baseline:
-        time1, inst_list1=schedule_instance.baseline_scheduling()
-    else:
-        if consider_connectivity:
-            time1, inst_list1=schedule_instance.dynamic_scheduling()
+    while not kernel_instance.processes_all_finished():
+        if baseline:
+            time1, inst_list1, shots=schedule_instance.baseline_scheduling()
         else:
-            if share_syndrome_qubits:
-                time1, inst_list1=schedule_instance.dynamic_scheduling_no_consider_connectivity()
+            if consider_connectivity:
+                time1, inst_list1, shots=schedule_instance.dynamic_scheduling()
             else:
-                time1, inst_list1=schedule_instance.scheduling_with_out_sharing_syndrome_qubit()
+                if share_syndrome_qubits:
+                    time1, inst_list1, shots=schedule_instance.dynamic_scheduling_no_consider_connectivity()
+                else:
+                    time1, inst_list1, shots=schedule_instance.scheduling_with_out_sharing_syndrome_qubit()
 
 
-    schedule_instance.print_dynamic_instruction_list(inst_list1)
-    qc=schedule_instance.construct_qiskit_circuit_for_backend(inst_list1)
-
-
-
-    # fig_t = qc.draw(output="mpl", fold=-1)
-    # fig_t.savefig("before_transpiled.png", dpi=200, bbox_inches="tight")
-    # plt.close(fig_t)
-
-    # qc.draw("mpl", fold=-1).show()
-    # print(qc.num_qubits)
-
-    # 0) Fake 156-qubit backend (your Pittsburgh layout)
-    fake_hard_ware = construct_10_qubit_hardware()
-
-
-    # 1) Build the abstract (logical) circuit and save as PNG
-    # qc = build_dynamic_circuit_15()
-    # save_circuit_png(qc, "abstract_circuit.png")  # uses Matplotlib
-
-    # 2) Transpile to hardware; map 15 logical qubits onto a single long row
-    #    (contiguous physical qubits minimize SWAPs on your lattice)
-    initial_layout = [i for i in range(10)]  # logical i -> physical i
+        schedule_instance.print_dynamic_instruction_list(inst_list1)
+        qc=schedule_instance.construct_qiskit_circuit_for_backend(inst_list1)
 
 
 
-    transpiled = transpile(
-        qc,
-        backend= fake_hard_ware,
-        initial_layout=initial_layout,
-        optimization_level=3,
-    )
-    print("\n=== Transpiled circuit ===")
-    print(transpiled)
+        # fig_t = qc.draw(output="mpl", fold=-1)
+        # fig_t.savefig("before_transpiled.png", dpi=200, bbox_inches="tight")
+        # plt.close(fig_t)
 
-    # Save the transpiled circuit PNG too
-    # import matplotlib.pyplot as plt
-    # fig_t = transpiled.draw(output="mpl", fold=-1)
-    # fig_t.savefig("transpiled_circuit.png", dpi=200, bbox_inches="tight")
-    # plt.close(fig_t)
+        # qc.draw("mpl", fold=-1).show()
+        # print(qc.num_qubits)
+
+        # 0) Fake 156-qubit backend (your Pittsburgh layout)
+        fake_hard_ware = construct_10_qubit_hardware()
 
 
+        # 1) Build the abstract (logical) circuit and save as PNG
+        # qc = build_dynamic_circuit_15()
+        # save_circuit_png(qc, "abstract_circuit.png")  # uses Matplotlib
 
-    process_list = schedule_instance.get_all_processes()
-    syndrome_history = schedule_instance.get_syndrome_map_history()
-    plot_process_schedule_on_10_qubit_hardware(
-        coupling_edges= fake_hard_ware.coupling_map,
-        syndrome_qubit_history=syndrome_history,
-        process_list=process_list,
-        out_png="hardware_processes.png",
-    )
+        # 2) Transpile to hardware; map 15 logical qubits onto a single long row
+        #    (contiguous physical qubits minimize SWAPs on your lattice)
+        initial_layout = [i for i in range(10)]  # logical i -> physical i
+
+
+
+        transpiled = transpile(
+            qc,
+            backend= fake_hard_ware,
+            initial_layout=initial_layout,
+            optimization_level=3,
+        )
+        print("\n=== Transpiled circuit ===")
+        print(transpiled)
+
+        # Save the transpiled circuit PNG too
+        # import matplotlib.pyplot as plt
+        # fig_t = transpiled.draw(output="mpl", fold=-1)
+        # fig_t.savefig("transpiled_circuit.png", dpi=200, bbox_inches="tight")
+        # plt.close(fig_t)
+
+
+
+        process_list = schedule_instance.get_all_processes()
+        syndrome_history = schedule_instance.get_syndrome_map_history()
+        plot_process_schedule_on_10_qubit_hardware(
+            coupling_edges= fake_hard_ware.coupling_map,
+            syndrome_qubit_history=syndrome_history,
+            process_list=process_list,
+            out_png="hardware_processes.png",
+        )
+        
+
+
+
+        # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
+
+        job = fake_hard_ware.run(transpiled, shots=shots)
+        result = job.result()
+        running_time=result.time_taken
+
     
 
+        sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.01, error_rate_2q=0.05, p_reset=0.02, p_meas=0.02))
+        tqc = transpile(transpiled, sim)
+        result = sim.run(tqc, shots=shots).result()
+        counts = result.get_counts(tqc)
+        final_result=schedule_instance.return_measure_states(counts)
+        # print("\n=== Counts(Fake hardware) ===")
+        print(counts)   
 
 
-    # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
-
-    job = fake_hard_ware.run(transpiled, shots=2000)
-    result = job.result()
-    running_time=result.time_taken
-
-   
-
-    sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.01, error_rate_2q=0.05, p_reset=0.02, p_meas=0.02))
-    tqc = transpile(transpiled, sim)
-    result = sim.run(tqc, shots=2000).result()
-    counts = result.get_counts(tqc)
-    # print("\n=== Counts(Fake hardware) ===")
-    print(counts)   
-
+        kernel_instance.update_process_results(final_result)
+        kernel_instance.reset_all_processes()
+        schedule_instance.reset_all_states()
 
 
     '''
@@ -742,8 +747,8 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
     # print(schedule_instance._process_measure_index)
 
 
-    final_result=schedule_instance.return_measure_states(counts)
-    #print(final_result)
+
+    final_result = kernel_instance._process_result_count
 
 
     ideal_result=schedule_instance.return_process_ideal_output()

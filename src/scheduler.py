@@ -101,6 +101,24 @@ class Scheduler:
 
 
 
+    def reset_all_states(self):
+        """
+        Reset the states of the scheduler
+        """
+        self._current_avalible = { i: True for i in range(0, self._qubit_num + 1) }
+        self._mapped_to_syndrome = { i: False for i in range(0, self._qubit_num + 1) }
+        self._used_counter = { i: 0 for i in range(0, self._qubit_num + 1) }   # Count of how many process used each qubit. Syndrome qubit might be reused
+        self._num_availble = self._qubit_num
+        self._current_process_in_execution = []
+        self._num_measurement = 0  # Keep track of the number of measurement instructions executed
+        self._syndrome_map_history = {}  # Keep track of all syndrome qubits that are used
+        self._measure_index_to_process = {}  # Map the index of measurement instruction to the process ID that generates it
+        self._process_measure_index = {}  # Map the process ID to the list of measurement instruction indices it generates
+    
+
+
+
+
     def calculate_all_pair_distance(self):
         """
         Calculate the distance between every pair of qubits on the hardware.
@@ -351,8 +369,8 @@ class Scheduler:
         """
         Put processes into a batch. But not sharying resources between processes in the same batch.
         """
-        processes_stack = self._kernel.get_processes().copy()
-
+        #processes_stack = self._kernel.get_processes().copy()
+        processes_stack, shots = self._kernel.get_next_process_batch()
         num_finish_process = 0
         total_qpu_time = 0
         final_inst_list = []
@@ -420,7 +438,7 @@ class Scheduler:
                     newReset=instruction(type=Instype.BARRIER,qubitaddress=None, processID=process_instance.get_processID(), time=total_qpu_time)
                     final_inst_list.append(newReset)            
 
-        return total_qpu_time,final_inst_list
+        return total_qpu_time,final_inst_list, shots
 
 
 
@@ -431,7 +449,8 @@ class Scheduler:
         The result of scheduling is a list of instruction which contain the instructions
         of all processes
         """
-        processes_stack = self._kernel.get_processes().copy()
+        #processes_stack = self._kernel.get_processes().copy()
+        processes_stack, shots = self._kernel.get_next_process_batch()
         total_qpu_time = 0
         final_inst_list = []
         current_measurement_index = 0 
@@ -490,7 +509,7 @@ class Scheduler:
             self.free_resources(process_instance)
             newReset=instruction(type=Instype.BARRIER,qubitaddress=None, processID=process_instance.get_processID(), time=total_qpu_time)
             final_inst_list.append(newReset)            
-        return total_qpu_time,final_inst_list
+        return total_qpu_time,final_inst_list, shots
 
 
 
@@ -507,7 +526,8 @@ class Scheduler:
         """
         Baseline dynamic scheduling algorithm without considering the connectivity of hardware.
         """
-        processes_stack = self._kernel.get_processes().copy()
+        #processes_stack = self._kernel.get_processes().copy()
+        processes_stack, shots = self._kernel.get_next_process_batch()
         processes_stack.sort(key=lambda x: x.get_start_time())  # Sort processes by start time
         num_process = len(processes_stack)
         num_finish_process = 0
@@ -687,7 +707,7 @@ class Scheduler:
                     self.free_syndrome_qubit(process_instance)
                     num_finish_process += 1
                     process_finish_map[process_instance] = True
-        return total_qpu_time, final_inst_list        
+        return total_qpu_time, final_inst_list , shots        
 
 
 
@@ -710,7 +730,8 @@ class Scheduler:
         (Each syndrome qubit in the virtual space is allocated on-the-fly)
         TODO: Optimize the allocation of syndrome qubits, should consider the connectivity of hardware.
         """
-        processes_stack = self._kernel.get_processes().copy()
+        #processes_stack = self._kernel.get_processes().copy()
+        processes_stack, shots = self._kernel.get_next_process_batch()
         processes_stack.sort(key=lambda x: x.get_start_time())  # Sort processes by start time
         num_process = len(processes_stack)
         num_finish_process = 0
@@ -907,7 +928,7 @@ class Scheduler:
                     self.free_syndrome_qubit(process_instance)
                     num_finish_process += 1
                     process_finish_map[process_instance] = True
-        return total_qpu_time, final_inst_list
+        return total_qpu_time, final_inst_list , shots
 
     def schedule(self):
         """
