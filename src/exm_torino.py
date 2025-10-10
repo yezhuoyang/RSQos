@@ -11,8 +11,35 @@ from process import process
 import numpy as np
 from qiskit_aer.noise import NoiseModel, QuantumError, ReadoutError
 from qiskit_aer.noise.errors import depolarizing_error, thermal_relaxation_error,pauli_error
-from fakeHardware import construct_10_qubit_hardware, save_circuit_png, plot_process_schedule_on_10_qubit_hardware, build_noise_model,distribution_fidelity
+from fakeHardware import construct_fake_ibm_torino, save_circuit_png, plot_process_schedule_on_torino, build_noise_model,distribution_fidelity
+from fakeHardware import construct_10_qubit_hardware
+from qiskit.transpiler import generate_preset_pass_manager
+from qiskit_ibm_runtime import EstimatorV2 as Estimator, SamplerV2 as Sampler
+from qiskit_ibm_runtime import QiskitRuntimeService
 
+
+
+APIKEY ="API"
+
+
+def torino_coupling_map():
+    COUPLING = [
+        [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [12, 13], [13, 14], # The first long row
+        [0,15], [15,19], [4,16], [16,23], [8,17], [17,27], [12,18], [18,31], # Short row 1
+        [19,20], [20,21], [21,22], [22,23], [23,24], [24,25], [25,26], [26,27], [27,28], [28,29], [29,30], [30,31], [31,32], [32,33], # The second long row
+        [21,34], [34,40], [25,35], [35,44], [29,36], [36,48], [33,37], [37,52], # Short row 2
+        [38,39], [39,40], [40,41], [41,42], [42,43], [43,44], [44,45], [45,46], [46,47], [47,48], [48,49], [49,50], [50,51], [51,52], # The third long row
+        [38,53], [53,57], [42,54], [54,61], [46,55], [55,65], [50,56], [56,69], # Short row 3
+        [57,58], [58,59], [59,60], [60,61], [61,62], [62,63], [63,64], [64,65], [65,66], [66,67], [67,68], [68,69], [69,70], [70,71], # The forth long row
+        [59,72], [72,78], [63,73], [73,82], [67,74], [74,86], [71,75], [75,90], # Short row 4
+        [76,77], [77,78], [78,79], [79,80], [80,81], [81,82], [82,83], [83,84], [84,85], [85,86], [86,87], [87,88], [88,89], [89,90], # The fifth long row
+        [76,91], [91,95], [80,92], [92,99], [84,93], [93,103], [88,94], [94,107], # Short row 5
+        [95,96], [96,97], [97,98], [98,99], [99,100], [100,101], [101,102], [102,103], [103,104], [104,105], [105,106], [106,107], [107,108], [108,109], # The sixth long row
+        [97,110], [110,116], [101,111], [111,120], [105,112], [112,124],[109,113], [113,128], # Short row 6
+        [114,115], [115,116], [116,117], [117,118], [118,119], [119,120], [120,121], [121,122], [122,123], [123,124], [124,125], [125,126], [126,127], [127,128], # The seventh long row
+        [114,129], [118, 130], [122,131], [126,132]  # Short row 7
+    ]
+    return COUPLING
 
 
 def generate_simples_example_for_test_1():
@@ -55,7 +82,7 @@ def generate_simples_example_for_test_1():
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=1,processID=2))  # Allocate 2 syndrome qubits
 
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
+    COUPLING = torino_coupling_map()  # linear chain
 
 
     #print(proc2)
@@ -63,7 +90,7 @@ def generate_simples_example_for_test_1():
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
 
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001,edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=133, error_rate=0.001,edge_list=COUPLING)
 
     return kernel_instance, virtual_hardware
 
@@ -133,7 +160,7 @@ def generate_simples_example_for_test_2():
     proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 2 syndrome qubits
 
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
+    COUPLING = torino_coupling_map()
 
 
     #print(proc2)
@@ -142,7 +169,7 @@ def generate_simples_example_for_test_2():
     kernel_instance.add_process(proc2)
     kernel_instance.add_process(proc3)
 
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001,edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=133, error_rate=0.001,edge_list=COUPLING)
 
     return kernel_instance, virtual_hardware
 
@@ -201,7 +228,7 @@ def generate_simples_example_for_test_3():
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=3,processID=2))  # Allocate 2 syndrome qubits
 
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0,5], [1,6], [2,7], [3,8], [4,9],[5,6], [6,7],[7,8],[8,9]]  # linear chain
+    COUPLING = torino_coupling_map()
 
 
     #print(proc2)
@@ -209,7 +236,7 @@ def generate_simples_example_for_test_3():
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
 
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001,edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=133, error_rate=0.001,edge_list=COUPLING)
 
     return kernel_instance, virtual_hardware
 
@@ -249,13 +276,12 @@ def generate_simples_example_for_test_4():
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)], size=1, processID=2))
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [1, 6], [2, 7], [3, 8], [4, 9],
-                [5, 6], [6, 7], [7, 8], [8, 9]]
+    COUPLING = torino_coupling_map()
 
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001, edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=133, error_rate=0.001, edge_list=COUPLING)
     return kernel_instance, virtual_hardware
 
 
@@ -313,14 +339,13 @@ def generate_simples_example_for_test_5():
     proc3.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata3.get_address(0)], size=1, processID=3))
     proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)], size=1, processID=3))
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [1, 6], [2, 7], [3, 8], [4, 9],
-                [5, 6], [6, 7], [7, 8], [8, 9]]
+    COUPLING = torino_coupling_map()
 
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
     kernel_instance.add_process(proc3)
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001, edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=133, error_rate=0.001, edge_list=COUPLING)
     return kernel_instance, virtual_hardware
 
 
@@ -361,13 +386,12 @@ def generate_simples_example_for_test_6():
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)], size=2, processID=2))
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
 
-    COUPLING = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [1, 6], [2, 7], [3, 8], [4, 9],
-                [5, 6], [6, 7], [7, 8], [8, 9]]
+    COUPLING = torino_coupling_map()
 
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000, 'max_physical_qubits': 10000, 'max_syndrome_qubits': 1000})
     kernel_instance.add_process(proc1)
     kernel_instance.add_process(proc2)
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001, edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=133, error_rate=0.001, edge_list=COUPLING)
     return kernel_instance, virtual_hardware
 
 
@@ -440,11 +464,11 @@ def generate_simples_example_for_test_7():
     p2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
 
     # ---------- Hardware & kernel ----------
-    COUPLING = [[0,1],[1,2],[2,3],[3,4],[0,5],[1,6],[2,7],[3,8],[4,9],[5,6],[6,7],[7,8],[8,9]]
+    COUPLING = torino_coupling_map()
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000,'max_physical_qubits': 10000,'max_syndrome_qubits': 1000})
     kernel_instance.add_process(p1)
     kernel_instance.add_process(p2)
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001, edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=133, error_rate=0.001, edge_list=COUPLING)
     return kernel_instance, virtual_hardware
 
 
@@ -515,11 +539,11 @@ def generate_simples_example_for_test_8():
     p2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
 
     # ---------- Hardware & kernel ----------
-    COUPLING = [[0,1],[1,2],[2,3],[3,4],[0,5],[1,6],[2,7],[3,8],[4,9],[5,6],[6,7],[7,8],[8,9]]
+    COUPLING = torino_coupling_map()
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000,'max_physical_qubits': 10000,'max_syndrome_qubits': 1000})
     kernel_instance.add_process(p1)
     kernel_instance.add_process(p2)
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001, edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=133, error_rate=0.001, edge_list=COUPLING)
     return kernel_instance, virtual_hardware
 
 
@@ -618,13 +642,16 @@ def generate_simples_example_for_test_9():
     p3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)], size=1, processID=3))
 
     # ---------- Hardware & kernel ----------
-    COUPLING = [[0,1],[1,2],[2,3],[3,4],[0,5],[1,6],[2,7],[3,8],[4,9],[5,6],[6,7],[7,8],[8,9]]
+    COUPLING = torino_coupling_map()
     kernel_instance = Kernel(config={'max_virtual_logical_qubits': 1000,'max_physical_qubits': 10000,'max_syndrome_qubits': 1000})
     kernel_instance.add_process(p1)
     kernel_instance.add_process(p2)
     kernel_instance.add_process(p3)
-    virtual_hardware = virtualHardware(qubit_number=10, error_rate=0.001, edge_list=COUPLING)
+    virtual_hardware = virtualHardware(qubit_number=133, error_rate=0.001, edge_list=COUPLING)
     return kernel_instance, virtual_hardware
+
+
+
 
 
 
@@ -665,7 +692,7 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
         # print(qc.num_qubits)
 
         # 0) Fake 156-qubit backend (your Pittsburgh layout)
-        fake_hard_ware = construct_10_qubit_hardware()
+        fake_hard_ware = construct_fake_ibm_torino()
 
 
         # 1) Build the abstract (logical) circuit and save as PNG
@@ -674,7 +701,7 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
 
         # 2) Transpile to hardware; map 15 logical qubits onto a single long row
         #    (contiguous physical qubits minimize SWAPs on your lattice)
-        initial_layout = [i for i in range(10)]  # logical i -> physical i
+        initial_layout = [i for i in range(133)]  # logical i -> physical i
 
 
 
@@ -697,7 +724,7 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
 
         process_list = schedule_instance.get_all_processes()
         syndrome_history = schedule_instance.get_syndrome_map_history()
-        plot_process_schedule_on_10_qubit_hardware(
+        plot_process_schedule_on_torino(
             coupling_edges= fake_hard_ware.coupling_map,
             syndrome_qubit_history=syndrome_history,
             process_list=process_list,
@@ -707,18 +734,22 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
 
 
 
-        # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
+        service = QiskitRuntimeService(channel="ibm_cloud",token=APIKEY)
+        
+        #backend = service.least_busy(simulator=False, operational=True)
+        backend = service.backend("ibm_torino")
 
-        job = fake_hard_ware.run(transpiled, shots=shots)
-        result = job.result()
-        running_time=result.time_taken
+        # Convert to an ISA circuit and layout-mapped observables.
+        pm = generate_preset_pass_manager(backend=backend, optimization_level=3)
+        isa_circuit = pm.run(transpiled)
+        
+        # run SamplerV2 on the chosen backend
+        sampler = Sampler(mode=backend)
+        sampler.options.default_shots = shots
 
-    
-
-        sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.01, error_rate_2q=0.05, p_reset=0.02, p_meas=0.02))
-        tqc = transpile(transpiled, sim)
-        result = sim.run(tqc, shots=shots).result()
-        counts = result.get_counts(tqc)
+        job = sampler.run([isa_circuit])
+        pub = job.result()[0]                 # first (and only) PUB result
+        counts = pub.join_data().get_counts() # convenient counts helper
         final_result=schedule_instance.return_measure_states(counts)
         # print("\n=== Counts(Fake hardware) ===")
         print(counts)   
@@ -729,19 +760,6 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
         schedule_instance.reset_all_states()
 
 
-    '''
-    Get the ideal result
-    '''
-    sim = AerSimulator()
-    tqc = transpile(qc, sim)
-
-    # Run with 1000 shots
-    result = sim.run(tqc, shots=2000).result()
-    idcounts = result.get_counts(tqc)
-    print("\n=== Counts(Ideal) ===")
-    print(idcounts)
-
-
 
     # print(schedule_instance._measure_index_to_process)
     # print(schedule_instance._process_measure_index)
@@ -749,8 +767,6 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
 
 
     final_result = kernel_instance._process_result_count
-
-
     ideal_result=schedule_instance.return_process_ideal_output()
     #print(ideal_result)
 
@@ -769,8 +785,8 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
 
 
 
-    print("The TRANSPILED circuit depth is:", transpiled .depth())
-
+    print("The TRANSPILED circuit depth is:", transpiled.depth())
+    running_time =0 
     print("\n=== Time taken:===")
     print(running_time)
 
@@ -795,6 +811,7 @@ if __name__ == "__main__":
         generate_simples_example_for_test_8,
         generate_simples_example_for_test_9,
     ]
+
 
     # Define the four scenarios we want to compare
     scenarios = [

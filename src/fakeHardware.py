@@ -230,6 +230,140 @@ def plot_process_schedule_on_10_qubit_hardware(coupling_edges: list[list[int]],
 
 
 
+def construct_fake_ibm_torino():
+    NUM_QUBITS = 133
+
+
+    # Directed edges (bidirectional 0<->1 and 1->2)
+    COUPLING = [
+        [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [12, 13], [13, 14], # The first long row
+        [0,15], [15,19], [4,16], [16,23], [8,17], [17,27], [12,18], [18,31], # Short row 1
+        [19,20], [20,21], [21,22], [22,23], [23,24], [24,25], [25,26], [26,27], [27,28], [28,29], [29,30], [30,31], [31,32], [32,33], # The second long row
+        [21,34], [34,40], [25,35], [35,44], [29,36], [36,48], [33,37], [37,52], # Short row 2
+        [38,39], [39,40], [40,41], [41,42], [42,43], [43,44], [44,45], [45,46], [46,47], [47,48], [48,49], [49,50], [50,51], [51,52], # The third long row
+        [38,53], [53,57], [42,54], [54,61], [46,55], [55,65], [50,56], [56,69], # Short row 3
+        [57,58], [58,59], [59,60], [60,61], [61,62], [62,63], [63,64], [64,65], [65,66], [66,67], [67,68], [68,69], [69,70], [70,71], # The forth long row
+        [59,72], [72,78], [63,73], [73,82], [67,74], [74,86], [71,75], [75,90], # Short row 4
+        [76,77], [77,78], [78,79], [79,80], [80,81], [81,82], [82,83], [83,84], [84,85], [85,86], [86,87], [87,88], [88,89], [89,90], # The fifth long row
+        [76,91], [91,95], [80,92], [92,99], [84,93], [93,103], [88,94], [94,107], # Short row 5
+        [95,96], [96,97], [97,98], [98,99], [99,100], [100,101], [101,102], [102,103], [103,104], [104,105], [105,106], [106,107], [107,108], [108,109], # The sixth long row
+        [97,110], [110,116], [101,111], [111,120], [105,112], [112,124],[109,113], [113,128], # Short row 6
+        [114,115], [115,116], [116,117], [117,118], [118,119], [119,120], [120,121], [121,122], [122,123], [123,124], [124,125], [125,126], [126,127], [127,128], # The seventh long row
+        [114,129], [118, 130], [122,131], [126,132]  # Short row 7
+    ]
+
+    BASIS = ["cz","id","rx","rz","rzz","sx","x"]  # add more *only* if truly native
+
+    SINGLE_QUBIT_GATE_LENGTH_NS = 32       # example: 0.222 ns timestep
+    SINGLE_QUBIT_GATE_LENGTH_NS = 88       # example: 0.222 ns timestep
+    READOUT_LENGTH_NS = 2584     # example measurement timestep
+
+
+    backend = GenericBackendV2(
+        num_qubits=NUM_QUBITS,
+        basis_gates=BASIS,         # optional
+        coupling_map=COUPLING,     # strongly recommended
+        control_flow=True,        # set True if you want dynamic circuits            
+        seed=1234,                 # reproducible auto-generated props
+        noise_info=True            # attach plausible noise/durations
+    )
+
+    return backend
+
+
+
+
+def torino_qubit_coords() -> list[tuple[float, float]]:
+    coords = [(0.0, 0.0)] * 133
+
+    # Long rows: each has 16 nodes, at x=0..15
+    long_starts = [0, 19, 38, 57, 76, 95, 114]
+    for r, start in enumerate(long_starts):
+        y = -2.0 * r
+        for k in range(15):
+            coords[start + k] = (float(k), y)
+
+    # Short rows: each has 4 nodes, alternating column anchors
+    short_starts = [15, 34, 53, 72, 91, 110, 129]
+
+    anchors_odd  = [0, 4, 8, 12]  # short rows 1,3,5,7
+    anchors_even = [2, 6, 10, 14]   # short rows 2,4,6
+    for s, start in enumerate(short_starts):
+        y = -(2.0 * s + 1.0)
+        xs = anchors_odd if (s % 2 == 0) else anchors_even
+        for j, x in enumerate(xs):
+            coords[start + j] = (float(x), y)
+
+    return coords
+
+
+
+def plot_process_schedule_on_torino(coupling_edges: list[list[int]],
+                               syndrome_qubit_history: list[int],
+                               process_list: list[process],
+                               out_png: str = "hardware_mapping_torino.png",
+                               figsize=(11, 9)):
+    """
+    Plot the layout and mapping of multiple processes on the Pittsburgh hardware.
+    """
+    coords = torino_qubit_coords()
+    cm = CouplingMap(coupling_edges)
+
+    # undirected edges for a clean look
+    pairs = cm.get_edges()
+    undirected = sorted(set(tuple(sorted((a, b))) for a, b in pairs))
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # edges
+    for a, b in undirected:
+        xa, ya = coords[a]; xb, yb = coords[b]
+        ax.plot([xa, xb], [ya, yb], linewidth=1.5, alpha=0.7, color="#20324d")
+
+    # nodes
+    xs = [xy[0] for xy in coords]; ys = [xy[1] for xy in coords]
+    ax.scatter(xs, ys, s=620, color="#0b1e3f", zorder=3)
+
+    # small index inside each node (physical index)
+    for i, (x, y) in enumerate(coords):
+        ax.text(x, y, str(i), ha="center", va="center", fontsize=7, color="white", zorder=4)
+
+
+    # --- give each process a unique color ---
+    colors = plt.cm.tab10(np.linspace(0, 1, len(process_list)))  # up to 10 distinct
+    for proc, color in zip(process_list, colors):
+        vaddress = proc.get_virtual_data_addresses()
+        label_physical_map = {}
+        for vaddr in vaddress:
+            phys = proc.get_data_qubit_virtual_hardware_mapping(vaddr)
+            if phys is not None:
+                label_physical_map[phys] = str(vaddr)
+
+        for phys, label in label_physical_map.items():
+            x, y = coords[phys]
+            ax.scatter([x], [y], s=780, facecolors="none", edgecolors=color,
+                       linewidths=2.6, zorder=5)
+            ax.text(x, y + 0.38, label , ha="center", va="bottom",
+                    fontsize=5, color=color, weight="bold", zorder=6)
+
+
+    for phys in syndrome_qubit_history.keys():
+        x, y = coords[phys]
+        vaddress_list = syndrome_qubit_history[phys]
+        label=",".join([str(vaddr) for vaddr in vaddress_list[:2]])
+        if len(vaddress_list)>2:
+            label+=",..."
+        ax.scatter([x], [y], s=780, facecolors="none", edgecolors="orange", linewidths=2.6, zorder=5)
+        ax.text(x, y + 0.38, label, ha="center", va="bottom",
+                fontsize=3, color="blue", weight="bold", zorder=6)
+
+
+
+    ax.set_aspect("equal"); ax.axis("off"); plt.tight_layout()
+    fig.savefig(out_png, dpi=220, bbox_inches="tight")
+    plt.close(fig)
+
+
 
 def construct_fake_ibm_pittsburgh():
     NUM_QUBITS = 156
@@ -1990,158 +2124,179 @@ def build_noise_model(error_rate_1q=0.001, error_rate_2q=0.01, p_reset=0.001, p_
 
 
 
+
+
+
 # ========================  MAIN  ========================
 if __name__ == "__main__":
+    
+    backend =construct_fake_ibm_torino()
+    COUPLING = [
+        [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [12, 13], [13, 14], # The first long row
+        [0,15], [15,19], [4,16], [16,23], [8,17], [17,27], [12,18], [18,31], # Short row 1
+        [19,20], [20,21], [21,22], [22,23], [23,24], [24,25], [25,26], [26,27], [27,28], [28,29], [29,30], [30,31], [31,32], [32,33], # The second long row
+        [21,34], [34,40], [25,35], [35,44], [29,36], [36,48], [33,37], [37,52], # Short row 2
+        [38,39], [39,40], [40,41], [41,42], [42,43], [43,44], [44,45], [45,46], [46,47], [47,48], [48,49], [49,50], [50,51], [51,52], # The third long row
+        [38,53], [53,57], [42,54], [54,61], [46,55], [55,65], [50,56], [56,69], # Short row 3
+        [57,58], [58,59], [59,60], [60,61], [61,62], [62,63], [63,64], [64,65], [65,66], [66,67], [67,68], [68,69], [69,70], [70,71], # The forth long row
+        [59,72], [72,78], [63,73], [73,82], [67,74], [74,86], [71,75], [75,90], # Short row 4
+        [76,77], [77,78], [78,79], [79,80], [80,81], [81,82], [82,83], [83,84], [84,85], [85,86], [86,87], [87,88], [88,89], [89,90], # The fifth long row
+        [76,91], [91,95], [80,92], [92,99], [84,93], [93,103], [88,94], [94,107], # Short row 5
+        [95,96], [96,97], [97,98], [98,99], [99,100], [100,101], [101,102], [102,103], [103,104], [104,105], [105,106], [106,107], [107,108], [108,109], # The sixth long row
+        [97,110], [110,116], [101,111], [111,120], [105,112], [112,124],[109,113], [113,128], # Short row 6
+        [114,115], [115,116], [116,117], [117,118], [118,119], [119,120], [120,121], [121,122], [122,123], [123,124], [124,125], [125,126], [126,127], [127,128], # The seventh long row
+        [114,129], [118, 130], [122,131], [126,132]  # Short row 7
+    ]
+
+
+    plot_process_schedule_on_torino(coupling_edges=COUPLING, syndrome_qubit_history={}, process_list=[], out_png="hardware_mapping_torino.png")
+
+    # kernel_instance, virtual_hardware = generate_example_ppt10_on_10_qubit_device_different_shots()
+    # #kernel_instance, virtual_hardware = generate_example_ppt10_on_10_qubit_device()
+
+    # schedule_instance = Scheduler(kernel_instance=kernel_instance, hardware_instance=virtual_hardware)
+
+
+
+    # dis=schedule_instance.calculate_all_pair_distance()
 
 
 
 
-    kernel_instance, virtual_hardware = generate_example_ppt10_on_10_qubit_device_different_shots()
-    #kernel_instance, virtual_hardware = generate_example_ppt10_on_10_qubit_device()
-
-    schedule_instance = Scheduler(kernel_instance=kernel_instance, hardware_instance=virtual_hardware)
-
-
-
-    dis=schedule_instance.calculate_all_pair_distance()
-
-
-
-
-    while not kernel_instance.processes_all_finished():
-        time1, inst_list1, shots=schedule_instance.dynamic_scheduling()
-        print("---------------------------------------------Scheduling result: total time ", time1, " this batch has shots: ", shots,"---------------------------------------------")
-        #time1, inst_list1=schedule_instance.baseline_scheduling()
-        #time1, inst_list1=schedule_instance.dynamic_scheduling_no_consider_connectivity()
-        #time1, inst_list1=schedule_instance.scheduling_with_out_sharing_syndrome_qubit()
-        schedule_instance.print_dynamic_instruction_list(inst_list1)
-        qc=schedule_instance.construct_qiskit_circuit_for_backend(inst_list1)
+    # while not kernel_instance.processes_all_finished():
+    #     time1, inst_list1, shots=schedule_instance.dynamic_scheduling()
+    #     print("---------------------------------------------Scheduling result: total time ", time1, " this batch has shots: ", shots,"---------------------------------------------")
+    #     #time1, inst_list1=schedule_instance.baseline_scheduling()
+    #     #time1, inst_list1=schedule_instance.dynamic_scheduling_no_consider_connectivity()
+    #     #time1, inst_list1=schedule_instance.scheduling_with_out_sharing_syndrome_qubit()
+    #     schedule_instance.print_dynamic_instruction_list(inst_list1)
+    #     qc=schedule_instance.construct_qiskit_circuit_for_backend(inst_list1)
 
 
 
-        # fig_t = qc.draw(output="mpl", fold=-1)
-        # fig_t.savefig("before_transpiled.png", dpi=200, bbox_inches="tight")
-        # plt.close(fig_t)
+    #     # fig_t = qc.draw(output="mpl", fold=-1)
+    #     # fig_t.savefig("before_transpiled.png", dpi=200, bbox_inches="tight")
+    #     # plt.close(fig_t)
 
-        # qc.draw("mpl", fold=-1).show()
-        # print(qc.num_qubits)
+    #     # qc.draw("mpl", fold=-1).show()
+    #     # print(qc.num_qubits)
 
-        # 0) Fake 156-qubit backend (your Pittsburgh layout)
-        fake_hard_ware = construct_10_qubit_hardware()
-
-
-        # 1) Build the abstract (logical) circuit and save as PNG
-        # qc = build_dynamic_circuit_15()
-        # save_circuit_png(qc, "abstract_circuit.png")  # uses Matplotlib
-
-        # 2) Transpile to hardware; map 15 logical qubits onto a single long row
-        #    (contiguous physical qubits minimize SWAPs on your lattice)
-        initial_layout = [i for i in range(10)]  # logical i -> physical i
+    #     # 0) Fake 156-qubit backend (your Pittsburgh layout)
+    #     fake_hard_ware = construct_10_qubit_hardware()
 
 
+    #     # 1) Build the abstract (logical) circuit and save as PNG
+    #     # qc = build_dynamic_circuit_15()
+    #     # save_circuit_png(qc, "abstract_circuit.png")  # uses Matplotlib
 
-        transpiled = transpile(
-            qc,
-            backend= fake_hard_ware,
-            initial_layout=initial_layout,
-            optimization_level=3,
-        )
-        # print("\n=== Transpiled circuit ===")
-        # print(transpiled)
-
-        # Save the transpiled circuit PNG too
-        # import matplotlib.pyplot as plt
-        # fig_t = transpiled.draw(output="mpl", fold=-1)
-        # fig_t.savefig("transpiled_circuit.png", dpi=200, bbox_inches="tight")
-        # plt.close(fig_t)
+    #     # 2) Transpile to hardware; map 15 logical qubits onto a single long row
+    #     #    (contiguous physical qubits minimize SWAPs on your lattice)
+    #     initial_layout = [i for i in range(10)]  # logical i -> physical i
 
 
 
-        process_list = schedule_instance.get_all_processes()
-        syndrome_history = schedule_instance.get_syndrome_map_history()
-        plot_process_schedule_on_10_qubit_hardware(
-            coupling_edges= fake_hard_ware.coupling_map,
-            syndrome_qubit_history=syndrome_history,
-            process_list=process_list,
-            out_png="hardware_processes.png",
-        )
+    #     transpiled = transpile(
+    #         qc,
+    #         backend= fake_hard_ware,
+    #         initial_layout=initial_layout,
+    #         optimization_level=3,
+    #     )
+    #     # print("\n=== Transpiled circuit ===")
+    #     # print(transpiled)
+
+    #     # Save the transpiled circuit PNG too
+    #     # import matplotlib.pyplot as plt
+    #     # fig_t = transpiled.draw(output="mpl", fold=-1)
+    #     # fig_t.savefig("transpiled_circuit.png", dpi=200, bbox_inches="tight")
+    #     # plt.close(fig_t)
+
+
+
+    #     process_list = schedule_instance.get_all_processes()
+    #     syndrome_history = schedule_instance.get_syndrome_map_history()
+    #     plot_process_schedule_on_10_qubit_hardware(
+    #         coupling_edges= fake_hard_ware.coupling_map,
+    #         syndrome_qubit_history=syndrome_history,
+    #         process_list=process_list,
+    #         out_png="hardware_processes.png",
+    #     )
         
 
 
 
-        # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
+    #     # 4) Run on the fake backend (Aer noise if installed; otherwise ideal) and print counts
 
-        job = fake_hard_ware.run(transpiled, shots=shots)
-        result = job.result()
-        running_time=result.time_taken
+    #     job = fake_hard_ware.run(transpiled, shots=shots)
+    #     result = job.result()
+    #     running_time=result.time_taken
 
     
 
-        sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.00, error_rate_2q=0.00, p_reset=0.00, p_meas=0.00))
-        tqc = transpile(transpiled, sim)
-        result = sim.run(tqc, shots=shots).result()
-        counts = result.get_counts(tqc)
-        # print("\n=== Counts(Fake hardware) ===")
-        print(counts)   
+    #     sim = AerSimulator(noise_model=build_noise_model(error_rate_1q=0.00, error_rate_2q=0.00, p_reset=0.00, p_meas=0.00))
+    #     tqc = transpile(transpiled, sim)
+    #     result = sim.run(tqc, shots=shots).result()
+    #     counts = result.get_counts(tqc)
+    #     # print("\n=== Counts(Fake hardware) ===")
+    #     print(counts)   
 
 
 
-        # '''
-        # Get the ideal result
-        # '''
-        # sim = AerSimulator()
-        # tqc = transpile(qc, sim)
+    #     # '''
+    #     # Get the ideal result
+    #     # '''
+    #     # sim = AerSimulator()
+    #     # tqc = transpile(qc, sim)
 
-        # # Run with 1000 shots
-        # result = sim.run(tqc, shots=2000).result()
-        # idcounts = result.get_counts(tqc)
-        # print("\n=== Counts(Ideal) ===")
-        # print(idcounts)
-
-
-
-
-
-        # print(schedule_instance._measure_index_to_process)
-        # print(schedule_instance._process_measure_index)
-
-
-        final_result=schedule_instance.return_measure_states(counts)
-        print("Final result from fake hardware:")
-        print(final_result)
-
-
-        kernel_instance.update_process_results(final_result)
-        kernel_instance.reset_all_processes()
-        schedule_instance.reset_all_states()
-
-
-
-    final_result = kernel_instance._process_result_count
-
-
-    ideal_result=schedule_instance.return_process_ideal_output()
-    #print(ideal_result)
-
-
-
-    average_fidelity=0
-    for pid in final_result.keys():
-        print("Ideal result for process ", pid)
-        print(ideal_result[pid])
-        print("Final result for process ", pid)
-        print(final_result[pid])
-        fidelity=distribution_fidelity(final_result[pid], ideal_result[pid])
-        average_fidelity+=fidelity
-        print(f"Fidelity for process {pid}: {fidelity:.4f}")
+    #     # # Run with 1000 shots
+    #     # result = sim.run(tqc, shots=2000).result()
+    #     # idcounts = result.get_counts(tqc)
+    #     # print("\n=== Counts(Ideal) ===")
+    #     # print(idcounts)
 
 
 
 
-    print("The TRANSPILED circuit depth is:", transpiled .depth())
 
-    print("\n=== Time taken:===")
-    print(running_time)
+    #     # print(schedule_instance._measure_index_to_process)
+    #     # print(schedule_instance._process_measure_index)
 
-    average_fidelity/=len(final_result.keys())
-    print(f"Average fidelity: {average_fidelity:.4f}")
+
+    #     final_result=schedule_instance.return_measure_states(counts)
+    #     print("Final result from fake hardware:")
+    #     print(final_result)
+
+
+    #     kernel_instance.update_process_results(final_result)
+    #     kernel_instance.reset_all_processes()
+    #     schedule_instance.reset_all_states()
+
+
+
+    # final_result = kernel_instance._process_result_count
+
+
+    # ideal_result=schedule_instance.return_process_ideal_output()
+    # #print(ideal_result)
+
+
+
+    # average_fidelity=0
+    # for pid in final_result.keys():
+    #     print("Ideal result for process ", pid)
+    #     print(ideal_result[pid])
+    #     print("Final result for process ", pid)
+    #     print(final_result[pid])
+    #     fidelity=distribution_fidelity(final_result[pid], ideal_result[pid])
+    #     average_fidelity+=fidelity
+    #     print(f"Fidelity for process {pid}: {fidelity:.4f}")
+
+
+
+
+    # print("The TRANSPILED circuit depth is:", transpiled .depth())
+
+    # print("\n=== Time taken:===")
+    # print(running_time)
+
+    # average_fidelity/=len(final_result.keys())
+    # print(f"Average fidelity: {average_fidelity:.4f}")
