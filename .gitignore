@@ -5,3 +5,4 @@ venv/*
 __pycache__/*
 *.png
 src/__pycache__/*
+*.pdf

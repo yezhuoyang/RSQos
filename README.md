@@ -279,3 +279,10 @@ The kernel manage all these process, optimize the resource usage.
 - [ ] Add instruction class correspond to if_test dynamic statement in Qiskit
 - [ ] HardwareJob abstraction
 - [ ] Support scheduling Process with different Shots
+
+
+
+# Find quantum time used by the job
+print(f"Quantum time used by job {job.job_id()} was {job.metrics()['usage']['quantum_seconds']} seconds")
+
+queue_info()
