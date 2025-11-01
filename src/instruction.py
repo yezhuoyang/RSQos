@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import List
 from virtualSpace import virtualSpace, virtualAddress  
+import qiskit.qasm2
 """
 instruction.py
 
@@ -21,10 +22,23 @@ class Instype(Enum):
     X = 2
     Y = 3
     Z = 3
-    CNOT = 4
-    RESET = 5
-    MEASURE = 6
-    BARRIER = 7  
+    T = 4
+    Tdg = 5
+    S = 6
+    Sdg = 7
+    SX = 8
+    RZ = 9
+    RX = 10
+    RY = 11
+    U3 = 12
+    Toffoli = 13
+    CNOT = 14
+    SWAP = 15
+    CSWAP = 16
+    CU1 = 17
+    RESET = 18
+    MEASURE = 19
+    BARRIER = 20
 
 
 """
@@ -34,6 +48,7 @@ and measurement operations in a quantum circuit simulation.
 """
 SINGLE_QUBIT_CLOCKTIME = 1
 TWO_QUBIT_CLOCKTIME = 1
+THREE_QUBIT_CLOCKTIME = 8
 RESET_CLOCKTIME = 100
 MEASURE_CLOCKTIME = 100
 T_STATE_CLOCKTIME = 500
@@ -49,10 +64,12 @@ def get_clocktime(type: Instype) -> int:
         int: The clock time for the instruction type.
     """
     match type:
-        case Instype.H | Instype.X | Instype.Y | Instype.Z:
+        case Instype.H | Instype.X | Instype.Y | Instype.Z | Instype.T | Instype.Tdg | Instype.S | Instype.Sdg | Instype.SX | Instype.RZ | Instype.RX | Instype.RY | Instype.U3:
             return SINGLE_QUBIT_CLOCKTIME
-        case Instype.CNOT:
+        case Instype.CNOT | Instype.SWAP | Instype.CU1:
             return TWO_QUBIT_CLOCKTIME
+        case Instype.Toffoli | Instype.CSWAP:
+            return THREE_QUBIT_CLOCKTIME
         case Instype.RESET:
             return RESET_CLOCKTIME
         case Instype.MEASURE:
@@ -83,8 +100,34 @@ def get_gate_type_name(type: Instype) -> str:
             return "Y"
         case Instype.Z:
             return "Z"
+        case Instype.T:
+            return "T"
+        case Instype.Tdg:
+            return "Tdg"
+        case Instype.S:
+            return "S"
+        case Instype.Sdg:
+            return "Sdg"
+        case Instype.SX:
+            return "SX"
+        case Instype.RZ:
+            return "RZ"
+        case Instype.RX:
+            return "RX"
+        case Instype.RY:
+            return "RY"
+        case Instype.U3:
+            return "U3"
+        case Instype.Toffoli:
+            return "Toffoli"
         case Instype.CNOT:
             return "CNOT"
+        case Instype.SWAP:
+            return "SWAP"
+        case Instype.CSWAP:
+            return "CSWAP"
+        case Instype.CU1:   
+            return "CU1"
         case Instype.RESET:
             return "RESET"
         case Instype.MEASURE:
@@ -102,7 +145,7 @@ class instruction:
     """
     Initialize a new instruction.
     """
-    def __init__(self, type:Instype, qubitaddress:List[virtualAddress],processID: int,time: int):
+    def __init__(self, type:Instype, qubitaddress:List[virtualAddress],processID: int,time: int,classical_address: int=None, params: List[float]=None) -> None:
         self._type=type
         self._time=time # This is the tim when the instruction is executed in the virtual machine
         self._scheduled_time=None  # This is the real time an instruction is performed in hardware after scheduling
@@ -110,6 +153,33 @@ class instruction:
         self._qubitaddress=qubitaddress
         self._scheduled_mapped_address={} # This is the physical address after scheduling
         self._processID=processID
+        self._params=params if params is not None else [] # The rotation angles for rotation gates, for example, for RZ(0.2*pi), params=[0.2]
+        if self._type==Instype.MEASURE:
+            if classical_address is None:
+                raise ValueError("Classical address must be provided for MEASURE instruction.")
+            self._classical_address=classical_address
+
+
+    def get_params(self) -> List[float]:
+        """
+        Return the parameters associated with the instruction.
+        
+        Returns:
+            List[float]: The list of parameters for the instruction.
+        """
+        return self._params
+    
+
+    def get_classical_address(self) -> int:
+        """
+        Get the classical address associated with the instruction.
+        
+        Returns:
+            int: The classical address for the instruction.
+        """
+        if self._type != Instype.MEASURE:
+            raise ValueError("Classical address is only applicable for MEASURE instructions.")
+        return self._classical_address
 
 
     def reset_mapping(self):
@@ -158,7 +228,6 @@ class instruction:
             dict: A dictionary mapping virtual qubit addresses to physical addresses.
         """
         return self._scheduled_mapped_address[qubitaddress]
-
 
 
     def get_processID(self) -> int:
@@ -229,39 +298,119 @@ class instruction:
             case Instype.Y:
                 outputstr+="Y"
             case Instype.Z:
-                outputstr+="Z"    
+                outputstr+="Z"
+            case Instype.T:
+                outputstr+="T"
+            case Instype.Tdg:
+                outputstr+="Tdg"
+            case Instype.S:
+                outputstr+="S"
+            case Instype.Sdg:
+                outputstr+="Sdg"
+            case Instype.SX:
+                outputstr+="SX"
+            case Instype.RZ:
+                outputstr+="RZ("+str(self._params[0])+"*pi)"
+            case Instype.RX:
+                outputstr+="RX("+str(self._params[0])+"*pi)"
+            case Instype.RY:
+                outputstr+="RY("+str(self._params[0])+"*pi)"
+            case Instype.U3:
+                outputstr+="U3("+str(self._params[0])+"*pi, "+str(self._params[1])+"*pi, "+str(self._params[2])+"*pi)"
+            case Instype.Toffoli:
+                outputstr+="Toffoli"    
             case Instype.CNOT:
                 outputstr+="CNOT"
+            case Instype.SWAP:
+                outputstr+="SWAP"
+            case Instype.CSWAP:
+                outputstr+="CSWAP"
+            case Instype.CU1:
+                outputstr+="CU1("+str(self._params[0])+"*pi)"
             case Instype.RESET:
                 outputstr+="RESET"
             case Instype.MEASURE:
-                outputstr+="MEASURE"
+                outputstr+="c" + str(self._classical_address) + "=MEASURE"
         outputstr+=" on qubit(" + ", ".join(map(str, self._qubitaddress)) + ") at time " + str(self._time)
         return outputstr
-
 
     def __repr__(self):
-        outputstr=""
-        match self._type:
-            case Instype.H:
-                outputstr+="H"
-            case Instype.X:
-                outputstr+="X"
-            case Instype.Y:
-                outputstr+="Y"
-            case Instype.Z:
-                outputstr+="Z"    
-            case Instype.CNOT:
-                outputstr+="CNOT"
-            case Instype.RESET:
-                outputstr+="RESET"
-            case Instype.MEASURE:
-                outputstr+="MEASURE"
-        outputstr+=" on qubit(" + ", ".join(map(str, self._qubitaddress)) + ") at time " + str(self._time)
-        return outputstr
+        return self.__str__()
+
+
+
+
+
+def parse_qasm_instruction(process_ID: int,instruction_str: str) -> List[instruction]:
+    """
+    Parse a QASM instruction string and return an Instruction object.
+    
+    Args:
+        instruction_str (str): The QASM instruction string.
+    """
+    circuit = qiskit.qasm2.loads(instruction_str)
+    qubit_number = circuit.num_qubits
+
+    vdata = virtualSpace(size=qubit_number, label="vdata")
+    vdata.allocate_range(0, qubit_number - 1)
+
+    inst_list = []
+    for instr, qargs, cargs in circuit.data:
+        name = instr.name.lower()
+        # Map QASM instruction names to Instruction types
+        if name == "h":
+            inst = instruction(type=Instype.H, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "x":
+            inst = instruction(type=Instype.X, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "y":
+            inst = instruction(type=Instype.Y, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "z":
+            inst = instruction(type=Instype.Z, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "t":
+            inst = instruction(type=Instype.T, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "tdg":
+            inst = instruction(type=Instype.Tdg, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "s":
+            inst = instruction(type=Instype.S, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "sdg":
+            inst = instruction(type=Instype.Sdg, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "sx":
+            inst = instruction(type=Instype.SX, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "rz":
+            inst = instruction(type=Instype.RZ, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, params=[cargs[1]])
+        elif name == "rx":
+            inst = instruction(type=Instype.RX, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, params=[cargs[1]])
+        elif name == "ry":
+            inst = instruction(type=Instype.RY, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, params=[cargs[1]])
+        elif name == "u3":
+            inst = instruction(type=Instype.U3, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, params=cargs[1:])
+        elif name == "ccx":
+            inst = instruction(type=Instype.Toffoli, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index), vdata.get_address(qargs[2]._index)], processID=process_ID, time=0)
+        elif name == "cx":
+            inst = instruction(type=Instype.CNOT, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)], processID=process_ID, time=0)
+        elif name == "swap":
+            inst = instruction(type=Instype.SWAP, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)], processID=process_ID, time=0)
+        elif name == "cswap":
+            inst = instruction(type=Instype.CSWAP, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index), vdata.get_address(qargs[2]._index)], processID=process_ID, time=0)
+        elif name == "cu1":
+            inst = instruction(type=Instype.CU1, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)], processID=process_ID, time=0, params=[cargs[1]])
+        elif name == "reset":
+            inst = instruction(type=Instype.RESET, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
+        elif name == "measure":
+            inst = instruction(type=Instype.MEASURE, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, classical_address=cargs[0]._index)
+        else:
+            raise ValueError(f"Unsupported instruction: {name}")
+
+        inst_list.append(inst)
+
+    return inst_list
 
 
 if __name__ == "__main__":
 
-    inst = instruction(type=Instype.H, qubitaddress=[0], time=5)
-    print(inst)
+   file_path = "C:\\Users\\yezhu\\OneDrive\\Documents\\GitHub\\FTQos\\benchmarks\\smallqasm\\adder_n4.qasm"
+   with open(file_path, "r") as file:
+       qasm_code = file.read()
+
+
+   parse_qasm_instruction(0,qasm_code)

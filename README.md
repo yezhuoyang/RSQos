@@ -1,19 +1,12 @@
-# FTQos
+# RSQOs
 
-A tiny operating system for fault-tolerant quantum computer based on lattice surgery. 
-We create some new concepts such as virtual logical qubit, virtual T factory, etc., for furture design of the OS.
-Also, we support a tiny kernel for resource managagement of fault-tolerant quantum computation.
-
-
-The first implementation will be based on TQEC software developed by Google https://tqec.github.io/tqec/
-All virtual quantum processes can be compiled to STIM program of qiskit program. 
-
+A tiny resource sharing operating system.
 
 
 
 # Initialize a FT quantum process
 
-In FTQOS, the quantum circuit is programmed on a virtual machine. 
+In RSQOs, the quantum circuit is programmed on a virtual machine. 
 There are two different virtual space, virtual data space and virtual syndrome space. 
 The process use syscall to initialize/deallocate virtual space.
 Following is an example of initialize a process object with a quantum circuit.
@@ -279,6 +272,7 @@ The kernel manage all these process, optimize the resource usage.
 - [ ] Add instruction class correspond to if_test dynamic statement in Qiskit
 - [ ] HardwareJob abstraction
 - [ ] Support scheduling Process with different Shots
+<<<<<<< HEAD
 
 
 
@@ -286,3 +280,5 @@ The kernel manage all these process, optimize the resource usage.
 print(f"Quantum time used by job {job.job_id()} was {job.metrics()['usage']['quantum_seconds']} seconds")
 
 queue_info()
+=======
+>>>>>>> 8296070879d2114a734ca05f3e18e1293063a84c
