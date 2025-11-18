@@ -1,5 +1,6 @@
 #A tiny kernel to execute fault-tolerant quantum programs
 #from tqec import BlockGraph, compile_block_graph, NoiseModel
+from typing import Union
 from process import process
 from instruction import *
 from syscall import *
@@ -16,6 +17,8 @@ class Kernel:
         self._max_syndrome_qubits = config.get('max_syndrome_qubits', 1000)
         self._processes = []
         self._process_result_count = {}
+        self._id_to_process = {}
+
 
 
 
@@ -45,6 +48,7 @@ class Kernel:
         if isinstance(process_instance, process):
             self._processes.append(process_instance)
             self._process_result_count[process_instance.get_processID()] = {}
+            self._id_to_process[process_instance.get_processID()] = process_instance
         else:
             raise TypeError("Expected a process instance.")
 
@@ -81,6 +85,13 @@ class Kernel:
                 proc.consume_shot(min_shot_num)
                 proc_batch.append(proc)
         return proc_batch, min_shot_num
+
+
+    def get_process_by_id(self, process_id: int) -> Union[process, None]:
+        """
+        Retrieve a process instance by its ID.
+        """
+        return self._id_to_process.get(process_id, None)
 
 
     def get_processes(self):

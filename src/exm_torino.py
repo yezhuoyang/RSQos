@@ -16,10 +16,10 @@ from fakeHardware import construct_10_qubit_hardware
 from qiskit.transpiler import generate_preset_pass_manager
 from qiskit_ibm_runtime import EstimatorV2 as Estimator, SamplerV2 as Sampler
 from qiskit_ibm_runtime import QiskitRuntimeService
+from datetime import datetime
 
 
-
-APIKEY ="API"
+APIKEY ="zkIgM0xZIJfR0CgMMvD7A6N-76pgelZ10cAp9gt1fywy"
 
 
 def torino_coupling_map():
@@ -52,12 +52,12 @@ def generate_simples_example_for_test_1():
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=1,processID=1))  # Allocate 1 syndrome qubit
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0),vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])  # Measure operation
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation     
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=0)  # Measure operation
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=1)  # Measure operation
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0),vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])  # Measure operation
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation    
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=2)  # Measure operation
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=3)  # Measure operation
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)],size=1 ,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=1,processID=1))  # Allocate 2 syndrome qubits
 
@@ -72,12 +72,12 @@ def generate_simples_example_for_test_1():
     proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=1,processID=2))  # Allocate 1 syndrome qubit
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0),vsyn2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])  # Measure operation
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation        
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=0)  # Measure operation
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=1)  # Measure operation        
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0),vsyn2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])  # Measure operation
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation  
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=2)  # Measure operation
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=3)  # Measure operation  
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)],size=1 ,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=1,processID=2))  # Allocate 2 syndrome qubits
 
@@ -107,18 +107,18 @@ def generate_simples_example_for_test_2():
     proc1.add_instruction(Instype.X, [vdata1.get_address(1)])
     proc1.add_instruction(Instype.X, [vdata1.get_address(2)])
     proc1.add_instruction(Instype.X, [vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation    
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=0)  # Measure operation
     proc1.add_instruction(Instype.X, [vsyn1.get_address(1)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])  # Measure operation    
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)],classical_address=1)  # Measure operation
     proc1.add_instruction(Instype.X, [vsyn1.get_address(2)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(2)])  # Measure operation    
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(2)],classical_address=2)  # Measure operation
     proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0),vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])  # Measure operation
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation        
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=3)  # Measure operation
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=4)  # Measure operation
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)],size=3 ,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=3,processID=1))  # Allocate 2 syndrome qubits
 
@@ -133,12 +133,12 @@ def generate_simples_example_for_test_2():
     proc2.add_instruction(Instype.X, [vdata2.get_address(1)])
     proc2.add_instruction(Instype.X, [vdata2.get_address(2)])
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0),vsyn2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])  # Measure operation    
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation  
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=0)  # Measure operation    
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=1)  # Measure operation  
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1),vsyn2.get_address(1)])
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)])  # Measure operation      
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)],classical_address=2)  # Measure operation      
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(2),vsyn2.get_address(2)])
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(2)])  # Measure operation           
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(2)],classical_address=3)  # Measure operation           
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)],size=3 ,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=3,processID=2))  # Allocate 2 syndrome qubits
 
@@ -154,8 +154,8 @@ def generate_simples_example_for_test_2():
     proc3.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 1 syndrome qubit
     proc3.add_instruction(Instype.X, [vdata3.get_address(0)])
     proc3.add_instruction(Instype.CNOT, [vdata3.get_address(0),vsyn3.get_address(0)])
-    proc3.add_instruction(Instype.MEASURE, [vdata3.get_address(0)])  # Measure operation    
-    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])  # Measure operation        
+    proc3.add_instruction(Instype.MEASURE, [vdata3.get_address(0)],classical_address=0)  # Measure operation    
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)],classical_address=1)  # Measure operation        
     proc3.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata3.get_address(0)],size=1 ,processID=3))  # Allocate 2 data qubits
     proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)],size=1,processID=3))  # Allocate 2 syndrome qubits
 
@@ -192,18 +192,18 @@ def generate_simples_example_for_test_3():
     proc1.add_instruction(Instype.X, [vdata1.get_address(1)])
     proc1.add_instruction(Instype.X, [vdata1.get_address(2)])
     proc1.add_instruction(Instype.X, [vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation    
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=0)  # Measure operation    
     proc1.add_instruction(Instype.X, [vsyn1.get_address(1)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])  # Measure operation    
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)],classical_address=1)  # Measure operation    
     proc1.add_instruction(Instype.X, [vsyn1.get_address(2)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(2)])  # Measure operation    
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(2)],classical_address=2)  # Measure operation    
     proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0),vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])  # Measure operation
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation        
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=3)  # Measure operation
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=4)  # Measure operation        
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)],size=3 ,processID=1))  # Allocate 2 data qubits
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)],size=3,processID=1))  # Allocate 2 syndrome qubits
 
@@ -218,12 +218,12 @@ def generate_simples_example_for_test_3():
     proc2.add_instruction(Instype.X, [vdata2.get_address(1)])
     proc2.add_instruction(Instype.X, [vdata2.get_address(2)])
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0),vsyn2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])  # Measure operation    
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])  # Measure operation  
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=0)  # Measure operation    
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=1)  # Measure operation  
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1),vsyn2.get_address(1)])
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)])  # Measure operation      
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)],classical_address=2)  # Measure operation      
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(2),vsyn2.get_address(2)])
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(2)])  # Measure operation           
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(2)],classical_address=3)  # Measure operation           
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)],size=3 ,processID=2))  # Allocate 2 data qubits
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)],size=3,processID=2))  # Allocate 2 syndrome qubits
 
@@ -255,9 +255,9 @@ def generate_simples_example_for_test_4():
     proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(1)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=0)
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=1)
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(1)],classical_address=2)
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)], size=2, processID=1))
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=1, processID=1))
 
@@ -271,8 +271,8 @@ def generate_simples_example_for_test_4():
     proc2.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=0)
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=1)
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)], size=1, processID=2))
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
 
@@ -299,10 +299,10 @@ def generate_simples_example_for_test_5():
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(2), vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(1)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(2)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=0)
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=1)
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(1)],classical_address=2)
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(2)],classical_address=3)
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)], size=3, processID=1))
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=1, processID=1))
 
@@ -317,10 +317,10 @@ def generate_simples_example_for_test_5():
     proc2.add_instruction(Instype.X, [vdata2.get_address(0)])
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(0)])
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(1)])
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)])
-    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=0)
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)],classical_address=1)
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=2)
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)],classical_address=3)
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)], size=2, processID=2))
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=2, processID=2))
 
@@ -334,8 +334,8 @@ def generate_simples_example_for_test_5():
     proc3.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn3.get_address(0)], size=1, processID=3))
     proc3.add_instruction(Instype.H, [vdata3.get_address(0)])
     proc3.add_instruction(Instype.CNOT, [vdata3.get_address(0), vsyn3.get_address(0)])
-    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])
-    proc3.add_instruction(Instype.MEASURE, [vdata3.get_address(0)])
+    proc3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)],classical_address=0)
+    proc3.add_instruction(Instype.MEASURE, [vdata3.get_address(0)],classical_address=1)
     proc3.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata3.get_address(0)], size=1, processID=3))
     proc3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)], size=1, processID=3))
 
@@ -360,11 +360,11 @@ def generate_simples_example_for_test_6():
     proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=2, processID=1))
     proc1.add_instruction(Instype.X, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=0)
     proc1.add_instruction(Instype.H, [vdata1.get_address(0)])
     proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(1)])
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])
-    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])
+    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)],classical_address=1)
+    proc1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=2)
     proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)], size=1, processID=1))
     proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=2, processID=1))
 
@@ -380,9 +380,9 @@ def generate_simples_example_for_test_6():
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(0)])
     proc2.add_instruction(Instype.X, [vdata2.get_address(1)])
     proc2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])
-    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)])
+    proc2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=0)
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=1)
+    proc2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)],classical_address=2)
     proc2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)], size=2, processID=2))
     proc2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
 
@@ -427,12 +427,11 @@ def generate_simples_example_for_test_7():
         p1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(0)])
         p1.add_instruction(Instype.CNOT, [vdata1.get_address(2), vsyn1.get_address(0)])
         # Measure syndrome each round (like repeated stabilizer readout)
-        p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
 
     # Read out data at the end
-    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])
-    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(1)])
-    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(2)])
+    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=0)
+    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(1)],classical_address=1)
+    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(2)],classical_address=2)
 
     p1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)], size=3, processID=1))
     p1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=1, processID=1))
@@ -453,12 +452,10 @@ def generate_simples_example_for_test_7():
         p2.add_instruction(Instype.CNOT, [src, vsyn2.get_address(0)])
         if r % 4 == 0:
             p2.add_instruction(Instype.X, [src])  # inject toggles to diversify Pauli frames
-        if (r + 1) % 5 == 0:
-            p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])
 
-    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])
-    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)])
-    p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])
+    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=3)
+    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)],classical_address=4)
+    p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=5)
 
     p2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)], size=2, processID=2))
     p2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
@@ -496,16 +493,13 @@ def generate_simples_example_for_test_8():
         # Round r: then onto syn1 (like X- and Z-type checks on separate ancillas)
         p1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(1)])
         p1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])
-        if r % 3 == 2:
-            p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
-            p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])
         if r % 2 == 1:
             p1.add_instruction(Instype.H, [vdata1.get_address(0)])
 
-    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])
-    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(1)])
-    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
-    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])
+    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=0)
+    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(1)],classical_address=1)
+    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=2)
+    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)],classical_address=3)
 
     p1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)], size=2, processID=1))
     p1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=2, processID=1))
@@ -525,15 +519,13 @@ def generate_simples_example_for_test_8():
         p2.add_instruction(Instype.CNOT, [vdata2.get_address(0), vsyn2.get_address(0)])
         p2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(0)])
         p2.add_instruction(Instype.CNOT, [vdata2.get_address(2), vsyn2.get_address(0)])
-        if r % 5 == 4:
-            p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])
         if r % 3 == 1:
             p2.add_instruction(Instype.X, [vdata2.get_address((r // 3) % 3)])
 
-    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])
-    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)])
-    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(2)])
-    p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])
+    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=4)
+    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)],classical_address=5)
+    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(2)],classical_address=6)
+    p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=7)
 
     p2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)], size=3, processID=2))
     p2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=1, processID=2))
@@ -569,15 +561,13 @@ def generate_simples_example_for_test_9():
         p1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])
         p1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(1)])
         p1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(2)])
-        if r % 4 == 3:
-            p1.add_instruction(Instype.MEASURE, [vsyn1.get_address((r // 4) % 3)])
         if r % 3 == 0:
             p1.add_instruction(Instype.H, [vdata1.get_address(0)])
 
-    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])
-    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)])
-    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(2)])
-    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)])
+    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)],classical_address=0)
+    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(1)],classical_address=1)
+    p1.add_instruction(Instype.MEASURE, [vsyn1.get_address(2)],classical_address=2)
+    p1.add_instruction(Instype.MEASURE, [vdata1.get_address(0)],classical_address=3)
 
     p1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0)], size=1, processID=1))
     p1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0)], size=3, processID=1))
@@ -602,13 +592,11 @@ def generate_simples_example_for_test_9():
         p2.add_instruction(Instype.CNOT, [vdata2.get_address(1), vsyn2.get_address(1)])
         if r % 2 == 0:
             p2.add_instruction(Instype.X, [vdata2.get_address((r // 2) % 2)])
-        if r % 3 == 2:
-            p2.add_instruction(Instype.MEASURE, [vsyn2.get_address((r // 3) % 2)])
 
-    p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)])
-    p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)])
-    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)])
-    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)])
+    p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(0)],classical_address=4)
+    p2.add_instruction(Instype.MEASURE, [vsyn2.get_address(1)],classical_address=5)
+    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(0)],classical_address=6)
+    p2.add_instruction(Instype.MEASURE, [vdata2.get_address(1)],classical_address=7)
 
     p2.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata2.get_address(0)], size=2, processID=2))
     p2.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn2.get_address(0)], size=2, processID=2))
@@ -630,13 +618,11 @@ def generate_simples_example_for_test_9():
         p3.add_instruction(Instype.CNOT, [vdata3.get_address(2), vsyn3.get_address(0)])
         if r % 4 == 1:
             p3.add_instruction(Instype.H, [vdata3.get_address((r // 4) % 3)])
-        if r % 5 == 4:
-            p3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])
 
-    p3.add_instruction(Instype.MEASURE, [vdata3.get_address(0)])
-    p3.add_instruction(Instype.MEASURE, [vdata3.get_address(1)])
-    p3.add_instruction(Instype.MEASURE, [vdata3.get_address(2)])
-    p3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)])
+    p3.add_instruction(Instype.MEASURE, [vdata3.get_address(0)],classical_address=8)
+    p3.add_instruction(Instype.MEASURE, [vdata3.get_address(1)],classical_address=9)
+    p3.add_instruction(Instype.MEASURE, [vdata3.get_address(2)],classical_address=10)
+    p3.add_instruction(Instype.MEASURE, [vsyn3.get_address(0)],classical_address=11)
 
     p3.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata3.get_address(0)], size=3, processID=3))
     p3.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn3.get_address(0)], size=1, processID=3))
@@ -651,7 +637,25 @@ def generate_simples_example_for_test_9():
     return kernel_instance, virtual_hardware
 
 
-
+def _as_dt(x):
+    """Parse Qiskit metrics timestamps to timezone-aware datetime or None."""
+    if x is None:
+        return None
+    if hasattr(x, "tzinfo"):  # already a datetime
+        return x
+    if isinstance(x, str):
+        # Handle trailing 'Z' and general ISO-8601
+        s = x.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(s)
+        except Exception:
+            try:
+                # Optional fallback if python-dateutil is available
+                from dateutil import parser as _parser
+                return _parser.isoparse(x)
+            except Exception:
+                return None
+    return None
 
 
 
@@ -665,7 +669,9 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
 
 
     dis=schedule_instance.calculate_all_pair_distance()
-
+    total_time=0
+    total_wait_time=0
+    total_wall_time=0
     while not kernel_instance.processes_all_finished():
         if baseline:
             time1, inst_list1, shots=schedule_instance.baseline_scheduling()
@@ -732,11 +738,10 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
         )
         
 
-
-
         service = QiskitRuntimeService(channel="ibm_cloud",token=APIKEY)
         
         #backend = service.least_busy(simulator=False, operational=True)
+
         backend = service.backend("ibm_torino")
 
         # Convert to an ISA circuit and layout-mapped observables.
@@ -748,12 +753,55 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
         sampler.options.default_shots = shots
 
         job = sampler.run([isa_circuit])
-        pub = job.result()[0]                 # first (and only) PUB result
-        counts = pub.join_data().get_counts() # convenient counts helper
-        final_result=schedule_instance.return_measure_states(counts)
-        # print("\n=== Counts(Fake hardware) ===")
-        print(counts)   
+        # Ensure it’s done so metrics/timestamps are populated
+        job.wait_for_final_state()
 
+
+        # --- timings ---
+        # 1) Quantum execution time (QPU time)
+        quantum_sec = float(job.usage() or 0.0)
+
+        # 2) Metrics/timestamps for waiting + wall time
+        mets = job.metrics() or {}
+        ts = mets.get("timestamps", {}) or {}
+
+        created  = _as_dt(ts.get("created"))
+        queued   = _as_dt(ts.get("queued"))
+        running  = _as_dt(ts.get("running"))
+        finished = _as_dt(ts.get("finished"))
+
+
+        # Waiting time: queued->running if available, else created->running as fallback
+        if running:
+            if queued:
+                wait_sec = (running - queued).total_seconds()
+            elif created:
+                wait_sec = (running - created).total_seconds()
+            else:
+                wait_sec = 0.0
+        else:
+            wait_sec = 0.0  # couldn't determine
+
+        # Wall time: created->finished if both present; fallback to running->finished
+        if created and finished:
+            wall_sec = (finished - created).total_seconds()
+        elif running and finished:
+            wall_sec = (finished - running).total_seconds()
+        else:
+            wall_sec = 0.0
+
+
+        # Accumulate
+        total_time += quantum_sec
+        total_wait_time += max(0.0, wait_sec)
+        total_wall_time += max(0.0, wall_sec)
+
+
+        # --- results ---
+        pub = job.result()[0]  # first (and only) PUB result
+        counts = pub.join_data().get_counts()
+        final_result = schedule_instance.return_measure_states(counts)
+        print(counts)
 
         kernel_instance.update_process_results(final_result)
         kernel_instance.reset_all_processes()
@@ -786,15 +834,14 @@ def test_scheduling(test_func, baseline=False, consider_connectivity=True, share
 
 
     print("The TRANSPILED circuit depth is:", transpiled.depth())
-    running_time =0 
     print("\n=== Time taken:===")
-    print(running_time)
+    print(total_time)
 
     average_fidelity/=len(final_result.keys())
     print(f"Average fidelity: {average_fidelity:.4f}")
 
 
-    return average_fidelity, transpiled.depth(), running_time
+    return average_fidelity, transpiled.depth(), total_time
 
 
 

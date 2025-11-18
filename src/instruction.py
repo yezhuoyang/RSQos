@@ -24,21 +24,23 @@ class Instype(Enum):
     Z = 3
     T = 4
     Tdg = 5
-    S = 6
-    Sdg = 7
-    SX = 8
-    RZ = 9
-    RX = 10
-    RY = 11
-    U3 = 12
-    Toffoli = 13
-    CNOT = 14
-    SWAP = 15
-    CSWAP = 16
-    CU1 = 17
-    RESET = 18
-    MEASURE = 19
-    BARRIER = 20
+    U = 6
+    S = 7
+    Sdg = 8
+    SX = 9
+    RZ = 10
+    RX = 11
+    RY = 12
+    U3 = 13
+    Toffoli = 14
+    CNOT = 15
+    CH = 16
+    SWAP = 17
+    CSWAP = 18
+    CP = 19
+    RESET = 20
+    MEASURE = 21
+    BARRIER = 22
 
 
 """
@@ -64,9 +66,9 @@ def get_clocktime(type: Instype) -> int:
         int: The clock time for the instruction type.
     """
     match type:
-        case Instype.H | Instype.X | Instype.Y | Instype.Z | Instype.T | Instype.Tdg | Instype.S | Instype.Sdg | Instype.SX | Instype.RZ | Instype.RX | Instype.RY | Instype.U3:
+        case Instype.H | Instype.X | Instype.Y | Instype.Z | Instype.T | Instype.Tdg | Instype.S | Instype.Sdg | Instype.SX | Instype.RZ | Instype.RX | Instype.RY | Instype.U3 | Instype.U:
             return SINGLE_QUBIT_CLOCKTIME
-        case Instype.CNOT | Instype.SWAP | Instype.CU1:
+        case Instype.CNOT | Instype.SWAP | Instype.CP | Instype.CH:
             return TWO_QUBIT_CLOCKTIME
         case Instype.Toffoli | Instype.CSWAP:
             return THREE_QUBIT_CLOCKTIME
@@ -102,6 +104,8 @@ def get_gate_type_name(type: Instype) -> str:
             return "Z"
         case Instype.T:
             return "T"
+        case Instype.U:
+            return "U"
         case Instype.Tdg:
             return "Tdg"
         case Instype.S:
@@ -126,8 +130,10 @@ def get_gate_type_name(type: Instype) -> str:
             return "SWAP"
         case Instype.CSWAP:
             return "CSWAP"
-        case Instype.CU1:   
-            return "CU1"
+        case Instype.CP:   
+            return "CP"
+        case Instype.CH:
+            return "CH"
         case Instype.RESET:
             return "RESET"
         case Instype.MEASURE:
@@ -158,6 +164,19 @@ class instruction:
             if classical_address is None:
                 raise ValueError("Classical address must be provided for MEASURE instruction.")
             self._classical_address=classical_address
+
+
+
+    def get_virtual_address_indices(self) -> List[str]:
+        """
+        Get the indices of the virtual addresses associated with the instruction.
+        
+        Returns:
+            List[str]: A list of virtual indices for the virtual addresses.
+            For each index, return q{index} if not a syndrome qubit, else return s{index}
+        """
+
+        return [f"q{addr.get_index()}" if not addr.is_syndrome() else f"s{addr.get_index()}" for addr in self._qubitaddress]
 
 
     def get_params(self) -> List[float]:
@@ -317,16 +336,20 @@ class instruction:
                 outputstr+="RY("+str(self._params[0])+"*pi)"
             case Instype.U3:
                 outputstr+="U3("+str(self._params[0])+"*pi, "+str(self._params[1])+"*pi, "+str(self._params[2])+"*pi)"
+            case Instype.U:
+                outputstr+="U("+str(self._params[0])+"*pi, "+str(self._params[1])+"*pi, "+str(self._params[2])+"*pi)"
             case Instype.Toffoli:
                 outputstr+="Toffoli"    
             case Instype.CNOT:
                 outputstr+="CNOT"
+            case Instype.CH:
+                outputstr+="CH"
             case Instype.SWAP:
                 outputstr+="SWAP"
             case Instype.CSWAP:
                 outputstr+="CSWAP"
-            case Instype.CU1:
-                outputstr+="CU1("+str(self._params[0])+"*pi)"
+            case Instype.CP:
+                outputstr+="CP("+str(self._params[0])+"*pi)"
             case Instype.RESET:
                 outputstr+="RESET"
             case Instype.MEASURE:
@@ -341,71 +364,6 @@ class instruction:
 
 
 
-def parse_qasm_instruction(process_ID: int,instruction_str: str) -> List[instruction]:
-    """
-    Parse a QASM instruction string and return an Instruction object.
-    
-    Args:
-        instruction_str (str): The QASM instruction string.
-    """
-    circuit = qiskit.qasm2.loads(instruction_str)
-    qubit_number = circuit.num_qubits
-
-    vdata = virtualSpace(size=qubit_number, label="vdata")
-    vdata.allocate_range(0, qubit_number - 1)
-
-    inst_list = []
-    for instr, qargs, cargs in circuit.data:
-        name = instr.name.lower()
-        # Map QASM instruction names to Instruction types
-        if name == "h":
-            inst = instruction(type=Instype.H, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "x":
-            inst = instruction(type=Instype.X, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "y":
-            inst = instruction(type=Instype.Y, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "z":
-            inst = instruction(type=Instype.Z, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "t":
-            inst = instruction(type=Instype.T, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "tdg":
-            inst = instruction(type=Instype.Tdg, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "s":
-            inst = instruction(type=Instype.S, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "sdg":
-            inst = instruction(type=Instype.Sdg, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "sx":
-            inst = instruction(type=Instype.SX, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "rz":
-            inst = instruction(type=Instype.RZ, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, params=[cargs[1]])
-        elif name == "rx":
-            inst = instruction(type=Instype.RX, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, params=[cargs[1]])
-        elif name == "ry":
-            inst = instruction(type=Instype.RY, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, params=[cargs[1]])
-        elif name == "u3":
-            inst = instruction(type=Instype.U3, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, params=cargs[1:])
-        elif name == "ccx":
-            inst = instruction(type=Instype.Toffoli, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index), vdata.get_address(qargs[2]._index)], processID=process_ID, time=0)
-        elif name == "cx":
-            inst = instruction(type=Instype.CNOT, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)], processID=process_ID, time=0)
-        elif name == "swap":
-            inst = instruction(type=Instype.SWAP, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)], processID=process_ID, time=0)
-        elif name == "cswap":
-            inst = instruction(type=Instype.CSWAP, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index), vdata.get_address(qargs[2]._index)], processID=process_ID, time=0)
-        elif name == "cu1":
-            inst = instruction(type=Instype.CU1, qubitaddress=[vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)], processID=process_ID, time=0, params=[cargs[1]])
-        elif name == "reset":
-            inst = instruction(type=Instype.RESET, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0)
-        elif name == "measure":
-            inst = instruction(type=Instype.MEASURE, qubitaddress=[vdata.get_address(qargs[0]._index)], processID=process_ID, time=0, classical_address=cargs[0]._index)
-        else:
-            raise ValueError(f"Unsupported instruction: {name}")
-
-        inst_list.append(inst)
-
-    return inst_list
-
-
 if __name__ == "__main__":
 
    file_path = "C:\\Users\\yezhu\\OneDrive\\Documents\\GitHub\\FTQos\\benchmarks\\smallqasm\\adder_n4.qasm"
@@ -413,4 +371,4 @@ if __name__ == "__main__":
        qasm_code = file.read()
 
 
-   parse_qasm_instruction(0,qasm_code)
+   #parse_qasm_instruction(0,qasm_code)

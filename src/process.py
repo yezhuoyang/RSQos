@@ -1,5 +1,6 @@
 #Fault-tolerant process on a fault-tolerant quantum computer
 
+from unicodedata import name
 from instruction import *
 from virtualSpace import virtualSpace, virtualAddress
 from syscall import *
@@ -8,6 +9,7 @@ from qiskit.circuit import Gate
 from qiskit.visualization import circuit_drawer
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit_aer import AerSimulator  # <- use AerSimulator (Qiskit 2.x)
+from qiskit.qasm2 import dumps
 
 
 
@@ -17,6 +19,103 @@ class ProcessStatus(Enum):
     WAIT_FOR_ANSILLA = 2
     WAIT_FOR_T_GATE = 3
     FINISHED = 4
+
+
+def relabel_clbits(instruction_str: str)-> QuantumCircuit:
+    """
+    Input is a quantum circuit with arbitrary measurement order and 
+    arbitrary set of classical register
+
+    We will relabel all qubit register and classical register to 
+    a single one dimensional virtual space. 
+
+
+    Output is a new quantum circuit with only one classical register with increasing order
+    """
+    circuit = qiskit.qasm2.loads(instruction_str)
+    num_clbits=len(circuit.clbits)
+    num_qubit=len(circuit.qubits)
+    qubit_index_map={circuit.qubits[i]:i for i in range(len(circuit.qubits))}
+    clbit_index_map={circuit.clbits[i]:i for i in range(len(circuit.clbits))}
+    
+
+    new_circ=QuantumCircuit(num_qubit,num_clbits)
+    for inst in circuit:
+        name=inst.operation.name
+        if name == "h":
+            reg=inst.qubits[0]
+            new_circ.h(qubit_index_map[reg])
+        elif name=='x':
+            reg=inst.qubits[0]
+            new_circ.x(qubit_index_map[reg])
+        elif name == "y":
+            reg=inst.qubits[0]
+            new_circ.y(qubit_index_map[reg])
+        elif name == "z":
+            reg=inst.qubits[0]
+            new_circ.z(qubit_index_map[reg])
+        elif name == "t":
+            reg=inst.qubits[0]
+            new_circ.t(qubit_index_map[reg])
+        elif name == "tdg":
+            reg=inst.qubits[0]
+            new_circ.tdg(qubit_index_map[reg])
+        elif name == "s":
+            reg=inst.qubits[0]
+            new_circ.s(qubit_index_map[reg])
+        elif name == "sdg":
+            reg=inst.qubits[0]
+            new_circ.sdg(qubit_index_map[reg])
+        elif name == "sx":
+            reg=inst.qubits[0]
+            new_circ.sx(qubit_index_map[reg])
+        elif name == "rx":
+            reg=inst.qubits[0]
+            new_circ.rx(inst.operation.params[0],qubit_index_map[reg])
+        elif name == "rz":
+            reg=inst.qubits[0]
+            new_circ.rz(inst.operation.params[0],qubit_index_map[reg])
+        elif name == "ry":
+            reg=inst.qubits[0]
+            new_circ.ry(inst.operation.params[0],qubit_index_map[reg])
+        elif name == "u":
+            reg=inst.qubits[0]
+            new_circ.u(inst.operation.params[0], inst.operation.params[1], inst.operation.params[2],qubit_index_map[reg])
+        elif name == "u3":
+            reg=inst.qubits[0]
+            new_circ.u(inst.operation.params[0], inst.operation.params[1], inst.operation.params[2],qubit_index_map[reg])
+        elif name == "ccx":
+            reg0, reg1, reg2 = inst.qubits[0], inst.qubits[1], inst.qubits[2]
+            new_circ.ccx(qubit_index_map[reg0], qubit_index_map[reg1], qubit_index_map[reg2])   
+        elif name == "cx":
+            reg0, reg1 = inst.qubits[0], inst.qubits[1]
+            new_circ.cx(qubit_index_map[reg0], qubit_index_map[reg1])
+        elif name == "cH":
+            reg0, reg1 = inst.qubits[0], inst.qubits[1]
+            new_circ.ch(qubit_index_map[reg0], qubit_index_map[reg1])
+        elif name == "swap":
+            reg0, reg1 = inst.qubits[0], inst.qubits[1]
+            new_circ.swap(qubit_index_map[reg0], qubit_index_map[reg1])
+        elif name == "cswap":
+            reg0, reg1, reg2 = inst.qubits[0], inst.qubits[1], inst.qubits[2]
+            new_circ.cswap(qubit_index_map[reg0], qubit_index_map[reg1], qubit_index_map[reg2])
+        elif name == "cu1":
+            params=inst.operation.params
+            reg0, reg1 = inst.qubits[0], inst.qubits[1]
+            new_circ.cp(params[0], qubit_index_map[reg0], qubit_index_map[reg1])
+        elif name == "reset":
+            reg=inst.qubits[0]
+            new_circ.reset(qubit_index_map[reg])
+        elif name == "measure":
+            creg=inst.clbits[0]
+            reg=inst.qubits[0]
+            new_circ.measure(qubit_index_map[reg], clbit_index_map[creg])
+        elif name == "barrier":
+            continue
+        else:
+            raise ValueError(f"Unsupported instruction: {name}")            
+        
+    return new_circ
 
 
 
@@ -84,7 +183,171 @@ class process:
         """
         self._data_qubit_inner_connectivity=None
         self._data_mapping_cost=None
-        
+        """
+        The mapping from the measurement index to measured 
+
+        For example, the real circuit might look like:
+
+        c3 = MEASURE q5
+        c2 = MEASURE q1
+        c1 = MEASURE q0
+
+        However, the measurement index should be 0,1,2,... in the order of measurement.
+        After we get the measurement result according to the measurement index,
+        we should map it back to the classical bit index used in the process.
+
+
+        Example:
+        self._process_measure_index = {
+            0: 3,
+            1: 2,
+            2: 1
+        }
+        """
+        self._process_measure_index = {}  # type: dict[int, int]
+
+
+
+
+    def reorder_bit_string(self,bitstring:str)-> str:
+        """
+        Given the measurement bitstring according to the measurement index,
+        Return the measurement bitstring according to the classical bit index used in the process.
+
+
+        For example, 
+        self._process_measure_index = {
+            0: 1,
+            1: 2,
+            2: 0
+        }
+
+        And the measured bitstring is(Use Little Endian encoding):
+
+        110
+
+        The actual classical bits should be:
+
+        bit index:  0 2 1
+
+        So the actual reordered bitstring should be:
+
+        101
+
+        """
+        reordered_bitstring = ['0'] * len(bitstring)
+        for meas_index, clbit_index in self._process_measure_index.items():
+            reordered_bitstring[clbit_index] = bitstring[len(bitstring) - 1 - meas_index]
+        return ''.join(reordered_bitstring)
+
+
+
+    def reorder_count(self,process_counts:dict)-> dict:
+        """
+        Given the measurement counts according to the measurement index,
+        Return the measurement counts according to the classical bit index used in the process.
+        """
+        reordered_counts = {}
+        for bitstring, count in process_counts.items():
+            reorder_bitstring = self.reorder_bit_string(bitstring)
+            reordered_counts[reorder_bitstring] = count
+        return reordered_counts
+
+
+
+
+
+    def process_str(self)-> str:
+        """
+        Print the standard representation of the process. Example:
+
+        q = alloc_data(3)
+        s = alloc_helper(3)
+        set_shot(1000)
+        H q2
+        CNOT q1, q2
+        CNOT q0, s0
+        CNOT q1, s1
+        X q1
+        CNOT q1, s2
+        c0 = MEASURE s0
+        c1 = MEASURE s1
+        c2 = MEASURE s2
+        deallocate_data(q)
+        deallocate_helper(s)    
+
+        """
+        outputstr = ""
+        outputstr+= f"q = alloc_data({self._num_data_qubits})\n"
+        outputstr+= f"s = alloc_helper({self._num_syndrome_qubits})\n"
+        outputstr += f"set_shot({self._shots})\n"
+
+
+        for inst in self._instruction_list:
+            if not isinstance(inst, instruction):
+                continue
+            type = inst.get_type()
+            virindex=inst.get_virtual_address_indices()
+            if type == Instype.H:
+                outputstr+= f"H {virindex[0]}\n"
+            elif type == Instype.X:
+                outputstr+= f"X {virindex[0]}\n"
+            elif type == Instype.Y:
+                outputstr+= f"Y {virindex[0]}\n"
+            elif type == Instype.Z:
+                outputstr+= f"Z {virindex[0]}\n"
+            elif type == Instype.T:
+                outputstr+= f"T {virindex[0]}\n"
+            elif type == Instype.Tdg:
+                outputstr+= f"Tdg {virindex[0]}\n"
+            elif type == Instype.S:
+                outputstr+= f"S {virindex[0]}\n"
+            elif type == Instype.Sdg:
+                outputstr+= f"Sdg {virindex[0]}\n"
+            elif type == Instype.SX:
+                outputstr+= f"SX {virindex[0]}\n"
+            elif type == Instype.RZ:
+                params=inst.get_params()
+                outputstr+= f"RZ({params[0]}) {virindex[0]}\n"
+            elif type == Instype.RX:
+                params=inst.get_params()
+                outputstr+= f"RX({params[0]}) {virindex[0]}\n"
+            elif type == Instype.RY:
+                params=inst.get_params()
+                outputstr+= f"RY({params[0]}) {virindex[0]}\n"
+            elif type == Instype.U:
+                params=inst.get_params()
+                outputstr+= f"U({params[0]}, {params[1]}, {params[2]}) {virindex[0]}\n"
+            elif type == Instype.U3:
+                params=inst.get_params()
+                outputstr+= f"U3({params[0]}, {params[1]}, {params[2]}) {virindex[0]}\n"
+            elif type == Instype.Toffoli:
+                outputstr+= f"Toffoli {virindex[0]}, {virindex[1]}, {virindex[2]}\n"
+            elif type == Instype.CNOT:
+                outputstr+= f"CNOT {virindex[0]}, {virindex[1]}\n"
+            elif type == Instype.CH:
+                outputstr+= f"CH {virindex[0]}, {virindex[1]}\n"
+            elif type == Instype.SWAP:
+                outputstr+= f"SWAP {virindex[0]}, {virindex[1]}\n"
+            elif type == Instype.CSWAP:
+                outputstr+= f"CSWAP {virindex[0]}, {virindex[1]}, {virindex[2]}\n"
+            elif type == Instype.CP:
+                params=inst.get_params()
+                outputstr+= f"CP({params[0]}) {virindex[0]}, {virindex[1]}\n"
+            elif type == Instype.RESET:
+                outputstr+= f"RESET {virindex[0]}\n"
+            elif type == Instype.MEASURE:
+                classical_address=inst.get_classical_address()
+                outputstr+= f"c{classical_address} = MEASURE {virindex[0]}\n"
+            else:
+                raise ValueError(f"Unsupported instruction")
+            
+        outputstr+= f"deallocate_data(q)\n"
+        outputstr+= f"deallocate_helper(s)\n"
+        return outputstr
+
+
+
 
     def get_total_shots(self):
         return self._shots
@@ -361,7 +624,6 @@ class process:
         raise NotImplementedError("This method needs to be implemented for parsing QASM programs.")
 
 
-
     def get_start_time(self) -> int:
         return self._start_time
 
@@ -378,13 +640,66 @@ class process:
         return self._num_syndrome_qubits
 
 
-    def add_instruction(self, type:Instype, qubitaddress:List[virtualAddress]):
+    def add_instruction(self, type:Instype, qubitaddress:List[virtualAddress],classical_address: int=None, params: List[float]=None):
         """
         Add an instruction to the process.
         """
         time = self._current_time
         self._current_time += get_clocktime(type)  # Increment time for the next instruction 
-        inst=instruction(type, qubitaddress, self._processID,time)
+
+        if type == Instype.H:
+            inst = instruction(type=Instype.H, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.X:
+            inst = instruction(type=Instype.X, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.Y:
+            inst = instruction(type=Instype.Y, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.Z:
+            inst = instruction(type=Instype.Z, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.T:
+            inst = instruction(type=Instype.T, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.Tdg:
+            inst = instruction(type=Instype.Tdg, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.S:
+            inst = instruction(type=Instype.S, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.Sdg:
+            inst = instruction(type=Instype.Sdg, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.SX:
+            inst = instruction(type=Instype.SX, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.RZ:
+            inst = instruction(type=Instype.RZ, qubitaddress=qubitaddress, processID=self._processID, time=0, params=params)
+        elif type == Instype.RX:
+            inst = instruction(type=Instype.RX, qubitaddress=qubitaddress, processID=self._processID, time=0, params=params)
+        elif type == Instype.RY:
+            inst = instruction(type=Instype.RY, qubitaddress=qubitaddress, processID=self._processID, time=0, params=params)
+        elif type == Instype.U:
+            inst = instruction(type=Instype.U, qubitaddress=qubitaddress, processID=self._processID, time=0, params=params)
+        elif type == Instype.U3:
+            inst = instruction(type=Instype.U3, qubitaddress=qubitaddress, processID=self._processID, time=0, params=params)
+        elif type == Instype.Toffoli:
+            inst = instruction(type=Instype.Toffoli, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.CNOT:
+            inst = instruction(type=Instype.CNOT, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.CH:
+            inst = instruction(type=Instype.CH, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.SWAP:
+            inst = instruction(type=Instype.SWAP, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.CSWAP:
+            inst = instruction(type=Instype.CSWAP, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.CP:
+            inst = instruction(type=Instype.CP, qubitaddress=qubitaddress, processID=self._processID, time=0, params=params)
+        elif type == Instype.RESET:
+            inst = instruction(type=Instype.RESET, qubitaddress=qubitaddress, processID=self._processID, time=0)
+        elif type == Instype.MEASURE:
+            """
+            Be careful also need to change the measurement index mapping in the process
+            """
+            inst = instruction(type=Instype.MEASURE, qubitaddress=qubitaddress, processID=self._processID, time=0, classical_address=classical_address)
+            self._process_measure_index[self._num_measurement] = classical_address
+        else:
+            raise ValueError(f"Unsupported instruction")
+
+
+        #inst=instruction(type, qubitaddress, self._processID,time)
         self._instruction_list.append(inst)
         self._executed[inst] = False
         if type == Instype.MEASURE:
@@ -398,6 +713,7 @@ class process:
             else:
                 if addr not in self._virtual_data_addresses:
                     self._virtual_data_addresses.append(addr)
+
 
     def get_instruction_list(self):
         return self._instruction_list
@@ -524,8 +840,6 @@ class process:
         # Combine them into one circuit
         qiskit_circuit = QuantumCircuit(dataqubit,  syndromequbit, classicalbits)
 
-
-        current_measurement = 0
         for inst in self._instruction_list:
             if isinstance(inst, instruction):
                 inst_name = get_gate_type_name(inst.get_type())
@@ -537,41 +851,61 @@ class process:
                     else:
                         qiskitaddress.append(dataqubit[addr.get_index()])
                 match inst.get_type():
-                    case Instype.CNOT:
-                        qiskit_circuit.cx(qiskitaddress[0], qiskitaddress[1])
+                    case Instype.H:
+                        qiskit_circuit.h(qiskitaddress[0])
                     case Instype.X:
-                        qiskit_circuit.x(qiskitaddress[0])                
+                        qiskit_circuit.x(qiskitaddress[0]) 
                     case Instype.Y:
                         qiskit_circuit.y(qiskitaddress[0]) 
                     case Instype.Z:
-                        qiskit_circuit.z(qiskitaddress[0])   
-                    case Instype.H: 
-                        qiskit_circuit.h(qiskitaddress[0])
+                        qiskit_circuit.z(qiskitaddress[0])  
+                    case Instype.T:
+                        qiskit_circuit.t(qiskitaddress[0])
+                    case Instype.Tdg:
+                        qiskit_circuit.tdg(qiskitaddress[0])
+                    case Instype.S:
+                        qiskit_circuit.s(qiskitaddress[0])
+                    case Instype.Sdg:
+                        qiskit_circuit.sdg(qiskitaddress[0])
+                    case Instype.SX:
+                        qiskit_circuit.sx(qiskitaddress[0])
+                    case Instype.RZ:
+                        params=inst.get_params()
+                        qiskit_circuit.rz(params[0], qiskitaddress[0])
+                    case Instype.RX:
+                        params=inst.get_params()
+                        qiskit_circuit.rx(params[0], qiskitaddress[0])
+                    case Instype.RY:
+                        params=inst.get_params()
+                        qiskit_circuit.ry(params[0], qiskitaddress[0])
+                    case Instype.U3:
+                        params=inst.get_params()
+                        qiskit_circuit.u3(params[0], params[1], params[2], qiskitaddress[0])
+                    case Instype.U:
+                        params=inst.get_params()
+                        qiskit_circuit.u(params[0], params[1], params[2], qiskitaddress[0])
+                    case Instype.Toffoli:
+                        qiskit_circuit.ccx(qiskitaddress[0], qiskitaddress[1], qiskitaddress[2])
+                    case Instype.CNOT:
+                        qiskit_circuit.cx(qiskitaddress[0], qiskitaddress[1])
+                    case Instype.CH:
+                        qiskit_circuit.ch(qiskitaddress[0], qiskitaddress[1])
+                    case Instype.SWAP:
+                        qiskit_circuit.swap(qiskitaddress[0], qiskitaddress[1])
+                    case Instype.CSWAP:
+                        qiskit_circuit.cswap(qiskitaddress[0], qiskitaddress[1], qiskitaddress[2])
+                    case Instype.CP:
+                        params=inst.get_params()
+                        qiskit_circuit.cp(params[0], qiskitaddress[0], qiskitaddress[1])
                     case Instype.RESET:
-                        qiskit_circuit.reset(qiskitaddress[0]) 
-                    case Instype.MEASURE:
-                        qiskit_circuit.measure(qiskitaddress[0], current_measurement)
-                        current_measurement += 1
-                        #Add reset after measurement
                         qiskit_circuit.reset(qiskitaddress[0])
+                    case Instype.MEASURE:
+                        classical_address=inst.get_classical_address()
+                        qiskit_circuit.measure(qiskitaddress[0], classical_address)
 
             elif isinstance(inst, syscall):
-                if not add_syscall_gates:
-                    continue
-                if isinstance(inst, syscall_magic_state_distillation):
-                    addresses = inst.get_address()
-                    qiskitaddress=[]
-                    for addr in addresses:
-                        print(addr)
-                        
-                        qiskitaddress.append(syndromequbit[addr.get_index()])
-                    qubit_num = len(addresses)
-                    my_gate = Gate(name=f"MAGIC", num_qubits=qubit_num, params=[])
-                    qiskit_circuit.append(my_gate, qiskitaddress)
-                else:
-                    qubit_num = self._num_data_qubits + self._num_syndrome_qubits
-                    my_gate = Gate(name=f"{inst.get_simple_name()}, P{self._processID}", num_qubits=qubit_num, params=[])
-                    qiskit_circuit.append(my_gate, list(range(qubit_num)))
+                continue
+
         self._qiskit_circuit = qiskit_circuit
         return qiskit_circuit
 
@@ -597,31 +931,127 @@ class process:
         fig.savefig(f"circuit_P{self._processID}.png", dpi=300, bbox_inches="tight")
 
 
+
+
+def parse_qasm_instruction(shots: int,process_ID: int,instruction_str: str) -> process:
+    """
+    Parse a QASM instruction string and return an Instruction object.
+    
+    Args:
+        instruction_str (str): The QASM instruction string.
+    """
+
+    circuit = relabel_clbits(instruction_str)
+    qubit_number = circuit.num_qubits
+
+    vdata = virtualSpace(size=qubit_number, label="vdata")    
+    vdata.allocate_range(0, qubit_number - 1)
+    vsyn = virtualSpace(size=0, label="vsyn", is_syndrome=True)
+    proc = process(processID=process_ID, start_time=0, vdataspace=vdata, vsyndromespace=vsyn, shots=shots)
+    proc.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata.get_address(0)],size=qubit_number,processID=process_ID))  # Allocate 2 data qubits
+    proc.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=None,size=0,processID=process_ID))  # Allocate 1 syndrome qubit
+
+
+    for instr, qargs, cargs in circuit.data:
+        name = instr.name.lower()
+        # Map QASM instruction names to Instruction types
+        #print(instr)
+        if name == "h":
+            proc.add_instruction(Instype.H, [vdata.get_address(qargs[0]._index)])
+        elif name == "x":
+            proc.add_instruction(Instype.X, [vdata.get_address(qargs[0]._index)])
+        elif name == "y":
+            proc.add_instruction(Instype.Y, [vdata.get_address(qargs[0]._index)])
+        elif name == "z":
+            proc.add_instruction(Instype.Z, [vdata.get_address(qargs[0]._index)])
+        elif name == "t":
+            proc.add_instruction(Instype.T, [vdata.get_address(qargs[0]._index)])
+        elif name == "tdg":
+            proc.add_instruction(Instype.Tdg, [vdata.get_address(qargs[0]._index)])
+        elif name == "s":
+            proc.add_instruction(Instype.S, [vdata.get_address(qargs[0]._index)])
+        elif name == "sdg":
+            proc.add_instruction(Instype.Sdg, [vdata.get_address(qargs[0]._index)])
+        elif name == "sx":
+            proc.add_instruction(Instype.SX, [vdata.get_address(qargs[0]._index)])
+        elif name == "rz":
+            proc.add_instruction(Instype.RZ, [vdata.get_address(qargs[0]._index)], params=instr.params)
+        elif name == "rx":
+            #print(instr)
+            proc.add_instruction(Instype.RX, [vdata.get_address(qargs[0]._index)], params=instr.params)
+        elif name == "ry":
+            proc.add_instruction(Instype.RY, [vdata.get_address(qargs[0]._index)], params=instr.params)
+        elif name == "u":
+            proc.add_instruction(Instype.U, [vdata.get_address(qargs[0]._index)], params=instr.params)
+        elif name == "u3":
+            proc.add_instruction(Instype.U3, [vdata.get_address(qargs[0]._index)], params=instr.params)
+        elif name == "ccx":
+            proc.add_instruction(Instype.Toffoli, [vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index), vdata.get_address(qargs[2]._index)])
+        elif name == "cx":
+            proc.add_instruction(Instype.CNOT, [vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)])
+        elif name == "ch":
+            proc.add_instruction(Instype.CH, [vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)])
+        elif name == "swap":
+            proc.add_instruction(Instype.SWAP, [vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)])
+        elif name == "cswap":
+            proc.add_instruction(Instype.CSWAP, [vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index), vdata.get_address(qargs[2]._index)])
+        elif name == "cp":
+            proc.add_instruction(Instype.CP, [vdata.get_address(qargs[0]._index), vdata.get_address(qargs[1]._index)], params=instr.params)
+        elif name == "reset":
+            proc.add_instruction(Instype.RESET, [vdata.get_address(qargs[0]._index)])
+        elif name == "measure":
+            proc.add_instruction(Instype.MEASURE, [vdata.get_address(qargs[0]._index)], classical_address=cargs[0]._index)
+        elif name == "barrier":
+            continue
+        else:
+            raise ValueError(f"Unsupported instruction: {name}")
+
+    proc.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata.get_address(0)],size=qubit_number ,processID=process_ID))  # Allocate 2 data qubits
+    proc.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=None,size=0,processID=process_ID))  # Allocate 2 syndrome qubits
+
+    return proc
+
+
+
+label_name_map = {
+    1: "adder_n4",
+    2: "basis_trotter_n4",
+    3: "bb84_n8",
+    4: "bell_n4",
+    5: "cat_state_n4",
+    6: "deutsch_n2",
+    7: "dnn_n2",
+    8: "dnn_n8",
+    9: "error_correctiond3_n5",
+    10: "fredkin_n3",
+    11: "grover_n2",
+    12: "hs4_n4",
+    13: "ising_n10",
+    14: "iswap_n2",
+    15: "lpn_n5",
+    16: "qaoa_n3",
+    17: "qaoa_n6",
+    18: "qec_en_n5",
+    19: "qft_n4",
+    20: "qrng_n4",
+    21: "simon_n6",
+    22: "teleportation_n3",
+    23: "toffoli_n3",
+    24: "vqe_n4",
+    25: "wstate_n3"
+}
+
 if __name__ == "__main__":
 
-    vdata1 = virtualSpace(size=10, label="vdata1")
-    vdata1.allocate_range(0,2)
-    vsyn1 = virtualSpace(size=5, label="vsyn1", is_syndrome=True)
-    vsyn1.allocate_range(0,4)
-    proc1 = process(processID=1,start_time=0, vdataspace=vdata1, vsyndromespace=vsyn1)
-    proc1.add_syscall(syscallinst=syscall_allocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3,processID=1))  # Allocate 2 data qubits
-    proc1.add_syscall(syscallinst=syscall_allocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
-    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])  # CNOT operation
-    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(1)])  # CNOT operation
-    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(0), vsyn1.get_address(0)])  # CNOT operation
-    proc1.add_syscall(syscallinst=syscall_magic_state_distillation(address=[vsyn1.get_address(2),vsyn1.get_address(3)],processID=1))  # Magic state distillation
+    label_name = label_name_map[1]
 
-    proc1.add_instruction(Instype.MEASURE, [vsyn1.get_address(0)])  # Measure operation
-    proc1.add_instruction(Instype.CNOT, [vdata1.get_address(1), vsyn1.get_address(2)])  # CNOT operation
-    proc1.add_syscall(syscallinst=syscall_deallocate_data_qubits(address=[vdata1.get_address(0),vdata1.get_address(1),vdata1.get_address(2)],size=3 ,processID=1))  # Allocate 2 data qubits
-    proc1.add_syscall(syscallinst=syscall_deallocate_syndrome_qubits(address=[vsyn1.get_address(0),vsyn1.get_address(1),vsyn1.get_address(2)],size=3,processID=1))  # Allocate 2 syndrome qubits
+    for label_name in label_name_map.values():
+        file_path = f"C:\\Users\\yezhu\\OneDrive\\Documents\\GitHub\\FTQos\\benchmarks\\smallqasm\\{label_name}.qasm"
 
+        with open(file_path, "r") as file:
+            qasm_code = file.read()  
+            proc=parse_qasm_instruction(shots=1000, process_ID=1, instruction_str=qasm_code)
 
-    proc1.analyze_syndrome_connectivity()
-    print(proc1._connectivity)
+            circ=proc.construct_qiskit_circuit(add_syscall_gates=False)
+            print(circ)
 
-
-    #proc1.construct_qiskit_diagram()
-
-    #proc1.construct_qiskit_circuit()
-    #proc1.simulate_circuit()

@@ -10,7 +10,7 @@ from qiskit.circuit import Gate
 from qiskit.visualization import circuit_drawer
 from qiskit.circuit.library import HGate
 from collections import deque
-
+import numpy as np
 
 def all_pairs_distances(n, edges):
     """
@@ -69,6 +69,87 @@ class HardwareJob:
     def calc_result(self):
         pass
 
+
+
+
+
+
+def construct_qiskit_circuit_from_inst_list(num_qubits,num_measurements,inst_list):
+    """
+    Construct a qiskit circuit from the instruction list.
+    Also help to visualize the circuit.
+    """
+    qiskit_circuit = qiskit.QuantumCircuit(num_qubits, num_measurements)
+    current_measurement = 0
+    for inst in inst_list:
+        if isinstance(inst, instruction):
+            process_id = inst.get_processID()
+            if inst.get_type() == Instype.BARRIER:
+                qiskit_circuit.barrier(label=f"P{process_id} barrier")
+                continue
+
+            addresses = inst.get_qubitaddress()
+            mapped_addresses = [
+                f"{inst.get_scheduled_mapped_address(addr)} ({addr})"
+                for addr in addresses
+            ]
+            addr_str = ", ".join(mapped_addresses)
+            addr_str= f"P{process_id}:" + addr_str
+            match inst.get_type():
+                case Instype.H: 
+                    qiskit_circuit.append(HGate(label=f"H(P{process_id})"),[inst.get_scheduled_mapped_address(addresses[0])]) 
+                case Instype.X:
+                    qiskit_circuit.x(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")                 
+                case Instype.Y:
+                    qiskit_circuit.y(inst.get_scheduled_mapped_address(addresses[0])) 
+                case Instype.Z:
+                    qiskit_circuit.z(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")   
+                case Instype.T:
+                    qiskit_circuit.t(inst.get_scheduled_mapped_address(addresses[0]))                 
+                case Instype.Tdg:
+                    qiskit_circuit.tdg(inst.get_scheduled_mapped_address(addresses[0]))
+                case Instype.S:
+                    qiskit_circuit.s(inst.get_scheduled_mapped_address(addresses[0]))
+                case Instype.Sdg:
+                    qiskit_circuit.sdg(inst.get_scheduled_mapped_address(addresses[0]))
+                case Instype.SX:
+                    qiskit_circuit.sx(inst.get_scheduled_mapped_address(addresses[0]))
+                case Instype.RZ:
+                    params=inst.get_params()
+                    qiskit_circuit.rz(np.pi*params[0], inst.get_scheduled_mapped_address(addresses[0]))
+                case Instype.RX:
+                    params=inst.get_params()
+                    qiskit_circuit.rx(np.pi*params[0], inst.get_scheduled_mapped_address(addresses[0]))
+                case Instype.RY:
+                    params=inst.get_params()
+                    qiskit_circuit.ry(np.pi*params[0], inst.get_scheduled_mapped_address(addresses[0]))
+                case Instype.U3:
+                    params=inst.get_params()
+                    qiskit_circuit.u(np.pi*params[0], np.pi*params[1], np.pi*params[2], inst.get_scheduled_mapped_address(addresses[0]))
+                case Instype.Toffoli:
+                    qiskit_circuit.ccx(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), inst.get_scheduled_mapped_address(addresses[2]), label=addr_str)
+                case Instype.CNOT:
+                    qiskit_circuit.cx(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), label=addr_str)
+                case Instype.CH:
+                    qiskit_circuit.ch(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), label=addr_str)
+                case Instype.SWAP:
+                    qiskit_circuit.swap(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), label=addr_str)
+                case Instype.CSWAP:
+                    qiskit_circuit.cswap(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), inst.get_scheduled_mapped_address(addresses[2]), label=addr_str)
+                case Instype.CP:
+                    params=inst.get_params()
+                    qiskit_circuit.cp(np.pi*params[0], inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), label=addr_str)
+                case Instype.RESET:
+                    qiskit_circuit.reset(inst.get_scheduled_mapped_address(addresses[0])) 
+                case Instype.MEASURE:
+                    qiskit_circuit.measure(inst.get_scheduled_mapped_address(addresses[0]), current_measurement)
+                    current_measurement += 1
+                    #Add reset after measurement
+                    qiskit_circuit.reset(inst.get_scheduled_mapped_address(addresses[0])) 
+                    
+    fig = circuit_drawer(qiskit_circuit, output="mpl", fold=-1) 
+    fig.savefig("my_circuit.png", dpi=300, bbox_inches="tight")
+    return qiskit_circuit
 
 
 
@@ -143,6 +224,9 @@ class Scheduler:
         return all_process_ideal_counts
 
 
+
+
+
     def return_measure_states(self, backend_result_counts):
         """
         After simulation/execution on hardware, return the measurement results for each process.
@@ -157,13 +241,18 @@ class Scheduler:
                 # Extract the bits corresponding to the current process's measurements
                 extracted_bits = ''.join(bitstring[self._num_measurement-1-idx] for idx in measure_indices)
                 # Reverse the bitstring to match Qiskit's output format
-                extracted_bits = extracted_bits[::-1]
+                #extracted_bits = extracted_bits[::-1]
                 if extracted_bits in process_counts:
                     process_counts[extracted_bits] += count
                 else:
                     process_counts[extracted_bits] = count
+
+
+            process=self._kernel.get_process_by_id(process_id)
+            process_counts=process.reorder_count(process_counts)
             print(f"\n=== Counts for Process {process_id} ===")
             print(process_counts)
+
             all_process_counts[process_id] = process_counts
         return all_process_counts
 
@@ -474,13 +563,16 @@ class Scheduler:
                     total_qpu_time += get_clocktime(inst.get_type())
                 else:
                     total_qpu_time += get_syscall_time(inst)
-                addresses = inst.get_qubitaddress() if isinstance(inst, instruction) else inst.get_address()
-                for addr in addresses:
-                    physical_qid = self._virtual_hardware_mapping.get_physical_qubit(addr)
-                    inst.set_scheduled_mapped_address(addr, physical_qid)
                 final_inst_list.append(inst)
 
+
                 if isinstance(inst, instruction):
+                    addresses = inst.get_qubitaddress() if isinstance(inst, instruction) else inst.get_address()
+                    for addr in addresses:
+                        physical_qid = self._virtual_hardware_mapping.get_physical_qubit(addr)
+                        inst.set_scheduled_mapped_address(addr, physical_qid)
+                    
+
                     if inst.is_measurement():
                         self._num_measurement += 1
                         self._measure_index_to_process[ current_measurement_index ] = process_instance.get_processID()
@@ -783,10 +875,7 @@ class Scheduler:
                         When the next instruction is a syscall for T factory or magic state distillation,
                         we change the status of the process to WAIT_FOR_T_GATE
                         """
-                        if isinstance(next_inst, syscall_magic_state_distillation):
-                            process_instance.set_status(ProcessStatus.WAIT_FOR_T_GATE)
-                        else:
-                            process_instance.set_status(ProcessStatus.RUNNING)
+                        process_instance.set_status(ProcessStatus.RUNNING)
                         continue
                     addresses = next_inst.get_qubitaddress()
                     
@@ -822,30 +911,11 @@ class Scheduler:
                         process_instance.set_status(ProcessStatus.RUNNING)
 
 
-            """
-            If there is any process waiting for T gate,
-            we use greedy algorithm to allocate T gate resources.
-            """
-            for process_instance in processes_stack:
-                if process_instance.get_status() == ProcessStatus.WAIT_FOR_T_GATE:
-                    t_next_inst = process_instance.get_next_instruction()
-                    addresses = t_next_inst.get_address()    
-                    if self._num_availble >= len(addresses):
-                        next_free_index_ = self.next_free_index(0)
-                        for addr in addresses:
-                            self._current_avalible[next_free_index_] = False
-                            self._used_counter[next_free_index_] = 1
-                            self._num_availble -= 1
-                            t_next_inst.set_scheduled_mapped_address(addr, next_free_index_)
-                            process_instance.set_syndrome_qubit_virtual_hardware_mapping(addr, next_free_index_)
-                            next_free_index_ = self.next_free_index(next_free_index_)
-                        process_instance.set_status(ProcessStatus.RUNNING)       
-
 
 
             """
             Execute the next instruction for all processes in RUNNING status.
-            These processes run in parallel.
+            These processes conceptually run in parallel.
             Update the total_qpu_time by the maximum time cost among all processes.
             Free ansilla qubit after running the instruction.
             """
@@ -862,18 +932,6 @@ class Scheduler:
                         move_time = max(move_time, tmp_time)
                         final_inst_list.append(next_inst)
 
-                        if isinstance(next_inst, syscall_magic_state_distillation):
-                            """
-                            If the instruction is a syscall for magic state distillation,
-                            We also have to freed the ansilla qubits used in this syscall
-                            """
-                            addresses = next_inst.get_address()
-                            for addr in addresses:
-                                physical_qid = next_inst.get_scheduled_mapped_address(addr)
-                                self._used_counter[physical_qid] -= 1
-                                self._current_avalible[physical_qid] = True
-                                self._num_availble += 1
-                                process_instance.empty_syndrome_qubit_mappings(addr)
 
 
                         if isinstance(next_inst, instruction):
@@ -1099,17 +1157,49 @@ class Scheduler:
                 addr_str = ", ".join(mapped_addresses)
                 addr_str= f"P{process_id}:" + addr_str
                 match inst.get_type():
-                    case Instype.CNOT:
-                        qiskit_circuit.cx(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), label=addr_str)
+                    case Instype.H: 
+                        qiskit_circuit.append(HGate(label=f"H(P{process_id})"),[inst.get_scheduled_mapped_address(addresses[0])]) 
                     case Instype.X:
                         qiskit_circuit.x(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")                 
                     case Instype.Y:
                         qiskit_circuit.y(inst.get_scheduled_mapped_address(addresses[0])) 
                     case Instype.Z:
                         qiskit_circuit.z(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")   
-                    case Instype.H: 
-                        qiskit_circuit.append(HGate(label=f"H(P{process_id})"),[inst.get_scheduled_mapped_address(addresses[0])])
-                        #qiskit_circuit.h(inst.get_scheduled_mapped_address(addresses[0]), label=f"P{process_id}")
+                    case Instype.T:
+                        qiskit_circuit.t(inst.get_scheduled_mapped_address(addresses[0]))                 
+                    case Instype.Tdg:
+                        qiskit_circuit.tdg(inst.get_scheduled_mapped_address(addresses[0]))
+                    case Instype.S:
+                        qiskit_circuit.s(inst.get_scheduled_mapped_address(addresses[0]))
+                    case Instype.Sdg:
+                        qiskit_circuit.sdg(inst.get_scheduled_mapped_address(addresses[0]))
+                    case Instype.SX:
+                        qiskit_circuit.sx(inst.get_scheduled_mapped_address(addresses[0]))
+                    case Instype.RZ:
+                        params=inst.get_params()
+                        qiskit_circuit.rz(params[0], inst.get_scheduled_mapped_address(addresses[0]))
+                    case Instype.RX:
+                        params=inst.get_params()
+                        qiskit_circuit.rx(params[0], inst.get_scheduled_mapped_address(addresses[0]))
+                    case Instype.RY:
+                        params=inst.get_params()
+                        qiskit_circuit.ry(params[0], inst.get_scheduled_mapped_address(addresses[0]))
+                    case Instype.U3:
+                        params=inst.get_params()
+                        qiskit_circuit.u(params[0], params[1], params[2], inst.get_scheduled_mapped_address(addresses[0]))
+                    case Instype.Toffoli:
+                        qiskit_circuit.ccx(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), inst.get_scheduled_mapped_address(addresses[2]))
+                    case Instype.CNOT:
+                        qiskit_circuit.cx(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]))
+                    case Instype.CH:
+                        qiskit_circuit.ch(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]))
+                    case Instype.SWAP:
+                        qiskit_circuit.swap(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]))
+                    case Instype.CSWAP:
+                        qiskit_circuit.cswap(inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]), inst.get_scheduled_mapped_address(addresses[2]))
+                    case Instype.CP:
+                        params=inst.get_params()
+                        qiskit_circuit.cp(params[0], inst.get_scheduled_mapped_address(addresses[0]), inst.get_scheduled_mapped_address(addresses[1]))
                     case Instype.RESET:
                         qiskit_circuit.reset(inst.get_scheduled_mapped_address(addresses[0])) 
                     case Instype.MEASURE:
